@@ -1,0 +1,7 @@
+*.mat
+*.o
+*.log
+*.png
+*.wav
+*~
+*.swp
