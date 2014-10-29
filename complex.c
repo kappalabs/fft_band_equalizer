@@ -64,11 +64,13 @@ double decibel(COMPLEX comp) {
 	return 20*log10(magnitude(comp));
 }
 
-
 void formatComplex(COMPLEX c, char *str) {
 	sprintf(str, "(%.3f; %.3fi)", c.re, c.im);
 }
 
+/*
+ *	Sets every element of given array to conjugate complex number
+ */
 void conjugate(C_ARRAY *ca) {
 	int i;
 	for (i=0; i<ca->len; i++) {
@@ -147,7 +149,7 @@ C_ARRS *initCAS(C_ARRS *cas, unsigned int len) {
 /*
  *	int len - length of array of samples to allocate
  *
- *	returns pointer to allocated and initialized C_ARRS structure
+ *	Returns pointer to allocated and initialized C_ARRS structure
  */
 C_ARRS *allocCAS(unsigned int len) {
 	C_ARRS *cas;

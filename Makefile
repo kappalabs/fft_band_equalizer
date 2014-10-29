@@ -1,13 +1,14 @@
-.PHONY: clear
+.PHONY:	clean debug run
 
-CC			= gcc
-CFLAGS	= -Wall -c -g -m64 -O0#-O3 -I./src
+CC		= gcc
+CFLAGS	= -Wall -c -g -m64 -O0
 LDFLAGS	= -Wall
 LDLIBS	= -lm
-PROG		= main
-OBJS		= main.o gnuplot_i.o fft.o complex.o string.o
-DEPS		= $(OBJS:.o=.h)
-RM			= rm -f *.png *.mat gnuplot_tmpdatafile_*
+PROG	= main
+OBJS	= main.o gnuplot_i.o fft.o complex.o string.o
+DEPS	= $(OBJS:.o=.h)
+GARBAGE = *.png *.mat gnuplot_tmpdatafile_*
+RM		= rm -f
 
 
 all:	$(PROG)
@@ -17,18 +18,6 @@ $(PROG):	$(OBJS)
 
 %.o:	%.c $(DEPS)
 	$(CC) $(CFLAGS) -o $@ $<
-
-#gnuplot_i.o:	gnuplot_i.c gnuplot_i.h
-#	${CC} ${CFLAGS} -o gnuplot_i.o gnuplot_i.c
-#
-#fft.o: fft.c fft.h
-#	${CC} ${CFLAGS} -o fft.o fft.c
-#
-#main.o: main.c
-#	${CC} ${CFLAGS} -o main.
-#
-#main:	gnuplot_i.o fft.o main.c
-#	${CC} ${LDLAGS} -o main main.c gnuplot_i.o fft.o -lm
 
 main.o:	gnuplot_i.o fft.o complex.o string.o	#? $(OBJS)
 
@@ -40,4 +29,4 @@ run:	clean $(PROG)
 	./main -d 80 -f sample.in >main.log
 
 clean:
-	$(RM) $(PROG) $(OBJS)
+	$(RM) $(GARBAGE) $(PROG) $(OBJS)

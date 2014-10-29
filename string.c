@@ -5,8 +5,12 @@
 #include "string.h"
 
 
+/*
+ *	FUNCTIONS FOR WORK WITH STRUCTURE STRING
+ */
+
 void initStr(STRING *s, unsigned int length, unsigned int start) {
-	s->len = 0;
+	s->len = start;
 	s->max = length-1;
 
 	int i;
@@ -45,11 +49,17 @@ void reallocStr(STRING *s, unsigned int nlen) {
 
 void freeStr(STRING *s) {
 	free(s->text);
+	s->text = NULL;
 	free(s);
+	s = NULL;
 }
 
-
-
+/*
+ *	FUNCTIONS FOR WORK WITH SIMPLE STRING REPRESENTATION
+ */
+/*
+ *	Initialize allocated string to zero bytes
+ */
 void initString(char *str, unsigned int length) {
 	int i;
 	for (i=0; i<length; i++) {

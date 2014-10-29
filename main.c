@@ -6,23 +6,20 @@
 #include <libgen.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <ctype.h>
 
 // interpret data in chart
 #include "gnuplot_i.h"
-// my parts
+// My header files
 #include "main.h"
 #include "fft.h"
 #include "complex.h"
 #include "string.h"
 
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
 
-
-#define DEBUG 50
+#define DEBUG 90
 static int debug = 0;
 #ifdef DEBUG
-//debug = DEBUG;
-
 void logOut(char *s, int level, int rec) {
 	if (level > debug) {
 		int i; 
@@ -41,32 +38,33 @@ void logOut(char *s, int level, int rec) {}
 
 
 /*
- *	Returns 1 if val is power of 2, 0 otherwise.
+ *	Returns 1 if given integer "val" is power of 2, 0 otherwise.
  */
 int isPowOf2(int val) {
 	return (val & (val-1)) == 0;
 }
 
 /*
- *	Returns nearest power of "base" (pow: 1,2,...), bigger or equal to "val"
+ *	Returns nearest power of integer value "base", which is bigger
+ *	 or equal to given value "val".
  */
 int getPow(int val, int base) {
-	int temp = base;
-	while(temp < val) {
-		temp *= base;
+	int nearest = 1;	// initialization to the first power of every integer
+	while (nearest < val) {
+		nearest *= base;
 	}
 
-	return temp;
+	return nearest;
 }
 
-static void initDoubles(double *ds, int len) {
+static void initDoubles(double *ds, unsigned int len) {
 	int i;
 	for (i=0; i<len; i++) {
 		ds[i] = 0.0f;
 	}
 }
 
-static double *allocDoubles(int len) {
+static double *allocDoubles(unsigned int len) {
 	double *d;
 	if ((d = (double *) malloc(len * sizeof(double))) == NULL) {
 		perror("malloc");
@@ -78,13 +76,17 @@ static double *allocDoubles(int len) {
 	return d;
 }
 
+/*
+ *	Loads one input sample ~ array of real numbers into
+ *	 C_ARRAY structure. Skips empty lines and everything
+ *	 after character '#', which can be used for comments.
+ */
 static C_ARRAY *readLine(FILE *fin) {
 	char c;
 	C_ARRAY *in_arr;
-	//TODO: vyresit default pocet prvku - navic musi byt mocnina 2-ou
-	in_arr = allocCA(1024);
-	//TODO: # prvku?
-	STRING *token = allocStr(32);
+	in_arr = allocCA(512);
+	STRING *token = allocStr(16);
+
 	// skip comments and empty lines
 	c = getc(fin);
 	while ((c == '#' || c == ' ' || c == '\t' || c == '\n') && c != EOF) {
@@ -93,6 +95,7 @@ static C_ARRAY *readLine(FILE *fin) {
 		}
 		c = getc(fin);
 	}
+
 	// read one line of input file
 	while (c != '\n' && c != EOF && c != '#') {
 		//initString(token, 32);
@@ -100,20 +103,23 @@ static C_ARRAY *readLine(FILE *fin) {
 		while (c == ' ' || c == '\t') {
 			c = getc(fin);
 		}
-		// read one whole token
+		// read one whole token ~ real number (double)
 		while (c != ' ' && c != '\n' && c != '\t') {
-			//strcat(token, c); 
+			// we need to allocate more space for this number
+			if (token->max - token->len < 1) {
+				reallocStr(token, token->max + 8);
+			}
 			token->text[token->len++] = c;
 			c = getc(fin);
 		}
 		// add new token to "in_arr"
 		if (token->text != '\0') {
 			double din = atof(token->text);
+			// we need to allocate space for few more numbers
 			if (in_arr->max - in_arr->len <= 20) {
-				reallocCA(in_arr, getPow(in_arr->len + 1024, 2));
+				reallocCA(in_arr, getPow(in_arr->len + 512, 2));
 			}
 			in_arr->c[in_arr->len].re = din;
-			// printf("nacten token %.2f\n", in_arr.c[in_arr.len].re);
 			in_arr->len++;
 		}
 
@@ -124,16 +130,18 @@ static C_ARRAY *readLine(FILE *fin) {
 	return in_arr;
 }
 
-static C_ARRS *readInput(char *file_name) {
+/*
+ *	Loads data from input file to structure C_ARRS.
+ *	Each input sample is on its line.
+ */
+static void readInput(C_ARRS *inputs, char *file_name) {
 	FILE *fin;
 
 	if ((fin = fopen(file_name, "r")) == NULL) {
-		logOut("Unable to open input file for reading.", 100, 0);
+		perror("fopen");
 		exit (ERROR_EXIT_CODE);
 	}
 
-	//TODO: proper default max value (# of max input samples/lines)
-	C_ARRS *inputs = allocCAS(8);
 	do {
 		// we need to allocate more space for input samples
 		if (inputs->max - inputs->len <= 1) {
@@ -145,18 +153,19 @@ static C_ARRS *readInput(char *file_name) {
 	freeCA(inputs->carrs[--inputs->len]);
 
 	if (fclose(fin) == EOF) {
-		logOut("Unable to close input file.", 100, 0);
+		perror("fclose");
 		exit (ERROR_EXIT_CODE);
 	}
-
-	return inputs;
 }
 
+/*
+ *	Writes array of complex numbers to specified file in Octave format
+ */
 static void writeOutput(char *file_name, C_ARRAY *ca) {
 	FILE *fout;
 
 	if ((fout = fopen(file_name, "w")) == NULL) {
-		logOut("Unable to open output file for writing.", 100, 0);
+		perror("fopen");
 		exit (ERROR_EXIT_CODE);
 	}
 
@@ -173,29 +182,43 @@ static void writeOutput(char *file_name, C_ARRAY *ca) {
 	}
 
 	if (fclose(fout) == EOF) {
-		logOut("Unable to close output file.", 100, 0);
+		perror("fclose");
 		exit (ERROR_EXIT_CODE);
 	}
 }
 
+void usage(char *name) {
+	fprintf(stderr, "usage: %s -f file [-d n]\n"
+									"  file: file containing input sounds\n"
+									"  -d n: changes debug level to value n, smaller value means more info\n"
+									"        (default value is 90)\n", name);
+	exit (ERROR_EXIT_CODE);
+}
 
 int main(int argc, char **argv) {
 	C_ARRS *ins;
+	ins = allocCAS(8);
 	
 	int opt;
 	while ((opt = getopt(argc, argv, "d:f:")) != -1) {
 		switch(opt) {
 			case 'd':
-				//TODO: je argument opravdu cislo?
 				debug = atoi(optarg);
 				printf("Changing debug level to %d\n", debug);
 				break;
 			case 'f':
 				printf("Reading input from file \"%s\"...\n", optarg);
-				ins = readInput(optarg);
+				readInput(ins, optarg);
+				break;
+			case '?':
+				usage(argv[0]);
 				break;
 		}
 	}
+	if (argc == 1 || ins->len == 0) {
+		usage(argv[0]);
+	}
+
 	printf("Got %d input samples\n", ins->len);
 
 	gnuplot_ctrl * g;
@@ -217,8 +240,7 @@ int main(int argc, char **argv) {
 		g = gnuplot_init();
 		gnuplot_cmd(g, "set terminal png");
 		gnuplot_setstyle(g, "lines");
-
-		printf("INPUT %d, length&2 of %d:\n", i+1, ilen2);
+		printf("INPUT %d, length->^2 of %d:\n", i+1, ilen2);
 		gnuplot_cmd(g, "set output \"input_%d.png\"", i+1);
 		for (j=0; j<ilen; j++) {
 			x[j] = j; y[j] = ins->carrs[i]->c[j].re;
@@ -270,9 +292,6 @@ int main(int argc, char **argv) {
 		initDoubles(y, imax);
 		ire = ifft(re);
 		for (j=0; j < ilen; j++) {
-//			ire->c[j].im /= ilen/2;
-//			ire->c[j].re /= ilen/2;
-//
 			x[j] = j; y[j] = ire->c[j].re;
 		}
 		char *dc = allocString(32);
@@ -280,6 +299,7 @@ int main(int argc, char **argv) {
 		formatComplex(ire->c[0], dc);
 		formatComplex(ire->c[ilen2/2], nq);
 		printf("DC slot = %s, Nyquist slot = %s\n", dc, nq);
+		free(dc); free(nq);
 		gnuplot_plot_xy(g, x, y, ilen, "Invers");
 		gnuplot_close(g);
 
@@ -291,9 +311,7 @@ int main(int argc, char **argv) {
 		free(fname);
 		free(x); free(y);
 		freeCA(ire); freeCA(re);
-		//freeCA(ins->carrs[i]);
 	}
-	//free(ins->carrs);
 	freeCAS(ins);
 
 	return (0);
