@@ -89,7 +89,7 @@ double toDouble(short int *data, int size, short int endian, short int b_len) {
 		}
 	}
 
-	return ret/pow(2, b_len*8);
+	return ret/pow(2, b_len*7)-1.0;
 }
 
 int initHeader(int fd) {
