@@ -5,7 +5,7 @@ CFLAGS	= -Wall -c -g -m64 -O0
 LDFLAGS	= -Wall
 LDLIBS	= -lm
 PROG	= main
-OBJS	= main.o gnuplot_i.o fft.o complex.o string.o
+OBJS	= main.o gnuplot_i.o fft.o complex.o string.o wave.o
 DEPS	= $(OBJS:.o=.h)
 GARBAGE = *.png *.mat gnuplot_tmpdatafile_*
 RM		= rm -f

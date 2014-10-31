@@ -1,8 +1,1 @@
-*.mat
-*.o
-*.log
-*.wav
-*~
-*.swp
-
 !*.png

@@ -15,6 +15,7 @@
 #include "fft.h"
 #include "complex.h"
 #include "string.h"
+#include "wave.h"
 
 
 #define DEBUG 90
@@ -198,7 +199,9 @@ void usage(char *name) {
 int main(int argc, char **argv) {
 	C_ARRS *ins;
 	ins = allocCAS(8);
-	
+
+	readWav("./testwave.wav");
+exit(0);	
 	int opt;
 	while ((opt = getopt(argc, argv, "d:f:")) != -1) {
 		switch(opt) {
