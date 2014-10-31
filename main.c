@@ -37,6 +37,8 @@ void logOut(char *s, int level, int rec) {
 void logOut(char *s, int level, int rec) {}
 #endif
 
+// this will store name of this program
+char const * program_name;
 
 /*
  *	Returns 1 if given integer "val" is power of 2, 0 otherwise.
@@ -188,38 +190,62 @@ static void writeOutput(char *file_name, C_ARRAY *ca) {
 	}
 }
 
-void usage(char *name) {
-	fprintf(stderr, "usage: %s -f file [-d n]\n"
-									"  file: file containing input sounds\n"
-									"  -d n: changes debug level to value n, smaller value means more info\n"
-									"        (default value is 90)\n", name);
+static void usage(void) {
+	fprintf(stderr, "Usage: %s -f file_in [-w] [-d level]\n"
+									"   -f in_file: set the name of an input file to \"file_in\"\n"
+									"   -w:         input file is in WAV format\n"
+									"   -d level:   changes debug level to \"level\", smaller value means more info\n"
+									"        (default value is 90, maximum is 100)\n", program_name);
 	exit (ERROR_EXIT_CODE);
 }
 
 int main(int argc, char **argv) {
+	program_name = basename(argv[0]);
+
 	C_ARRS *ins;
 	ins = allocCAS(8);
 
-	readWav("./testwave.wav");
-exit(0);	
 	int opt;
-	while ((opt = getopt(argc, argv, "d:f:")) != -1) {
+	int f_flag=0;	// read input from file in_file
+	int w_flag=0;	// treat input as file in WAV format
+	char *in_file;// stores name of input file (if f_flag==1)
+	while ((opt = getopt(argc, argv, "f:wd:")) != -1) {
 		switch(opt) {
+			case 'f':
+				// set in_file name to the value of the next argument
+				f_flag = 1;
+				in_file = optarg;
+				break;
+			case 'w':
+				// read in_file as WAV sound file
+				w_flag = 1;
+				break;
 			case 'd':
+				// get debug level (integer value)
 				debug = atoi(optarg);
 				printf("Changing debug level to %d\n", debug);
 				break;
-			case 'f':
-				printf("Reading input from file \"%s\"...\n", optarg);
-				readInput(ins, optarg);
-				break;
 			case '?':
-				usage(argv[0]);
+				usage();
 				break;
 		}
 	}
-	if (argc == 1 || ins->len == 0) {
-		usage(argv[0]);
+
+	// in_file is required argument
+	if (f_flag == 0) {
+		fprintf(stderr, "in_file required\n");
+		usage();
+	}
+
+	// w_flag was not set, read in_file as raw input data ~ default
+	if (w_flag == 0) {
+		printf("Reading raw data from file \"%s\"...\n", in_file);
+		readInput(ins, in_file);
+	}
+	// w_flag was set, read in_file as WAV
+	else {
+		printf("Reading wav input file from \"%s\"...\n", in_file);
+		readWav(ins, in_file);
 	}
 
 	printf("Got %d input samples\n", ins->len);

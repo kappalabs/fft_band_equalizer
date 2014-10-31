@@ -3,7 +3,7 @@ Band equalizer using FFT
 
 Introduction
 ------------
-This project is meant to be implementation of simple band equalizer with 11 bands controlable by user in C language. Input can be either raw data or sound file in WAV format.
+This project is meant to be an implementation of simple band equalizer with 11 bands controlable by user in C language. Input can be either raw data or sound file in WAV format.
 
 Requirements
 ------------

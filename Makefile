@@ -23,10 +23,12 @@ main.o:	gnuplot_i.o fft.o complex.o string.o	#? $(OBJS)
 
 
 debug:	clean $(PROG)
-	valgrind 2>valgrind.log --track-origins=yes --leak-check=full --show-leak-kinds=all ./main -d 90 -f sample.in >main.log
+#	valgrind 2>valgrind.log --track-origins=yes --leak-check=full --show-leak-kinds=all ./main -d 90 -f sample.in >main.log
+	valgrind 2>valgrind.log --track-origins=yes --leak-check=full --show-leak-kinds=all ./main -f "dve-32.wav" -w >main.log
 
 run:	clean $(PROG)
-	./main -d 80 -f sample.in >main.log
+#	./main -d 80 -f sample.in >main.log
+	./main -f "dve-32.wav" -w >main.log
 
 clean:
 	$(RM) $(GARBAGE) $(PROG) $(OBJS)
