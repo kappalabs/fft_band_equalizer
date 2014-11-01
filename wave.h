@@ -6,15 +6,18 @@
 
 
 struct element {
-	unsigned short int endian;	// 1 - big endian, 0 - little endian
-	unsigned int offset;				// in number of bytes
-	unsigned short int size;		// in mumber of bytes
-	char *name;									// few characters specifiing name
-	short int *data;		// stores the data on this position itself
+	short endian; // 1 - big endian, 0 - little endian
+	int   offset; // in number of bytes
+	short size;   // in number of bytes
+	char *name;   // few characters specifying name
+	char *data;   // stores the data of this element itself
 };
 
 
-
-extern void readWav(C_ARRS *cas, char *path);
+extern int getNumChannels(struct element *h);
+extern int getSampleRate(struct element *h);
+extern struct element *readWav(C_ARRS *cas, char *path);
+extern void freeHeader(struct element *header);
+extern void writeWav(struct element *h, C_ARRS *cas, char *fpath);
 
 #endif

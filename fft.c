@@ -10,6 +10,24 @@
 //#undef M_PI
 //#define M_PI 3.14159265358979323846264338327950288
 
+int freqToIndex(int freq, int len, int rate) {
+	return (freq*len)/rate;
+}
+
+void modulate(C_ARRAY *ca, int st, int tg, int mult) {
+	int i;
+	for (i=st; i<tg; i++) {
+		ca->c[i].re *= mult;
+		ca->c[i].im *= mult;
+	}
+}
+
+void modulateFreq(C_ARRAY *ca, int st, int tg, int mult, int srate) {
+	int fst = freqToIndex(st, ca->max, srate);
+	int ftg = freqToIndex(tg, ca->max, srate);
+	printf("st=%d, fst=%d; tg=%d, ftg=%d", st, fst, tg, ftg);
+	modulate(ca, fst, ftg, mult);
+}
 
 /*
  *	Counts Fourier transform, also makes scaling

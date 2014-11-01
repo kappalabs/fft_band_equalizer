@@ -237,6 +237,8 @@ int main(int argc, char **argv) {
 		usage();
 	}
 
+	struct element *header;
+
 	// w_flag was not set, read in_file as raw input data ~ default
 	if (w_flag == 0) {
 		printf("Reading raw data from file \"%s\"...\n", in_file);
@@ -245,7 +247,7 @@ int main(int argc, char **argv) {
 	// w_flag was set, read in_file as WAV
 	else {
 		printf("Reading wav input file from \"%s\"...\n", in_file);
-		readWav(ins, in_file);
+		header = readWav(ins, in_file);
 	}
 
 	printf("Got %d input samples\n", ins->len);
@@ -260,7 +262,7 @@ int main(int argc, char **argv) {
 		int ilen2 = getPow(ilen, 2); //ins->carrs[i]->len;
 		int imax = ins->carrs[i]->max;
 		//TODO: vyresit rozsamplovani po castech 4096
-//		ilen = 4*4096;
+//		ilen = 4096;
 //		ilen2 = ilen;
 //		imax = ilen;
 		double *x = allocDoubles(imax);
@@ -293,7 +295,12 @@ int main(int argc, char **argv) {
 		initDoubles(x, imax);
 		initDoubles(y, imax);
 		re = fft(ins->carrs[i]);
-		for (j=0; j < ilen2/2; j++) {
+		int srate = getSampleRate(header);
+//TODO: EXPERIMENTAL
+//		re->max = ilen;
+modulateFreq(re, 2000, srate/2, 0.9, srate);
+
+		for (j=0; j < ilen2; j++) {
 //			x[j] = j*ilen/ilen2; y[j] = 0;
 //			double mag = magnitude(re->c[j]);
 //			if (mag==mag) {
@@ -332,6 +339,14 @@ int main(int argc, char **argv) {
 		gnuplot_plot_xy(g, x, y, ilen, "Invers");
 		gnuplot_close(g);
 
+//TODO: EXPERIMENTAL
+		C_ARRS *caso;
+		caso = allocCAS(1);
+		caso->carrs[caso->len++] = ire;
+		writeWav(header, caso, "./output.wav");
+		free(caso->carrs);
+		free(caso);
+
 		sprintf(fname, "invers_%d.mat", i+1);
 		writeOutput(fname, ire);
 
@@ -341,6 +356,7 @@ int main(int argc, char **argv) {
 		free(x); free(y);
 		freeCA(ire); freeCA(re);
 	}
+	freeHeader(header);
 	freeCAS(ins);
 
 	return (0);
