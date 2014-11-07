@@ -54,8 +54,9 @@ int toInt(char *data, int size, short int endian) {
 	return ret;
 }
 
-int elementToInt(struct element h) {
-	return toInt(h.data, h.size, h.endian);
+int elementToInt(struct element *h, int pos) {
+	int b = (toInt(h[0].data, h[0].size, h[0].endian) == 0x52494658) ? 1 : h[pos].endian;
+	return toInt(h[pos].data, h[pos].size, b);
 }
 
 /*
@@ -90,29 +91,29 @@ double toDouble(char *data, int size, short endian) {
  *	Returns number of channels as it is in given header
  */
 int getNumChannels(struct element *h) {
-	return elementToInt(h[6]);
+	return elementToInt(h, 6);
 }
 
 /*
  *	Returns rate of samples in Hz as it is in given header
  */
 int getSampleRate(struct element *h) {
-	return elementToInt(h[7]);
+	return elementToInt(h, 7);
 }
 
 /*
  *	Returns number of bytes in the data block
  */
 int getSubchunk2Size(struct element *h) {
-	return elementToInt(h[12]);
+	return elementToInt(h, 12);
 }
 
 /*
  *	Compares data in element.data with given integer value
- *	 and returns 0 if values are equal, -1 otherwise.
+ *	 and returns 0 if values are equal, 1 otherwise.
  */
-int elementComp(struct element el, unsigned int val) {
-	if (elementToInt(el) == val) {
+int elementComp(struct element *h, int pos, unsigned int val) {
+	if (elementToInt(h, pos) == val) {
 		return 0;
 	}
 	return 1;
@@ -140,20 +141,22 @@ int initHeader(int fd) {
 		
 		header[i].data = buf;
 		printf("%s = ", header[i].name);
-		//TODO: if 4 prvni byty RIFX namisto RIFF, uzivej pouze big-endian
+		// use big endian
 		if (header[i].endian == 1) {
 			printf("%s\n", header[i].data);
 		} else {
-			printf("%d\n", elementToInt(header[i]));
+			printf("%d\n", elementToInt(header, i));
 		}
 	}
 
 	// simple check, if file has WAVE header
-	if (elementComp(header[2], 0x57415645) != 0) {
+	if (elementComp(header, 2, 0x57415645) != 0) {
+		fprintf(stderr, "Not a WAV file header\n");
 		return -1;
 	}
 	// compression is not supported
-	if (elementToInt(header[5]) != 1) {
+	if (elementToInt(header, 5) != 1) {
+		fprintf(stderr, "Compression unsupported\n");
 		return -1;
 	}
 
@@ -175,16 +178,16 @@ C_ARRAY *getChannel(int fd, short ch_id) {
 	// # of readed bytes
 	int r=0;
 	// # of bits per sample
-	int bps = elementToInt(header[10]);
+	int bps = elementToInt(header, 10);
 	// # of bytes per sample
 	int B_SIZE = bps/8;
 	char *buf = (char *) calloc(B_SIZE, sizeof(char));
 	// jump to offset where the data starts
 	lseek(fd, 44+B_SIZE*ch_id, SEEK_SET);
 	// # of channels
-	int nch = elementToInt(header[6]);
+	int nch = elementToInt(header, 6);
 	// # of total samples
-	int tns = elementToInt(header[12]);
+	int tns = elementToInt(header, 12);
 
 	while (read(fd, buf, B_SIZE) > 0 && r < tns) {
 		// we need more memory for next samples/values
@@ -220,7 +223,7 @@ struct element *readWav(C_ARRS *cas, char *fpath) {
 		return NULL;
 	}
 
-	int nch = elementToInt(header[6]);
+	int nch = elementToInt(header, 6);
 	// allocate to the # of in channels
 	if (cas->max - cas->len < nch) {
 		reallocCAS(cas, cas->max + nch);
@@ -263,9 +266,9 @@ void denormalize(char *buf, double d, int size, int endian) {
 }
 
 int writeChannel(struct element *h, C_ARRAY *ca, int fd, int ch_id) {
-	int nch = elementToInt(h[6]);
-	int bps = elementToInt(h[10]);
-	int tot = elementToInt(h[12]);
+	int nch = elementToInt(h, 6);
+	int bps = elementToInt(h, 10);
+	int tot = elementToInt(h, 12);
 	int B_SIZE = bps/8;	// # of bytes per sample
 	int ctw = tot/(B_SIZE*nch);	// # of chunks (of size B_SIZE) to be written out
 

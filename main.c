@@ -12,7 +12,7 @@
 #include "gnuplot_i.h"
 // My header files
 #include "main.h"
-#include "fft.h"
+#include "equalizer.h"
 #include "complex.h"
 #include "string.h"
 #include "wave.h"
@@ -191,9 +191,11 @@ static void writeOutput(char *file_name, C_ARRAY *ca) {
 }
 
 static void usage(void) {
-	fprintf(stderr, "Usage: %s -f file_in [-w] [-d level]\n"
+	fprintf(stderr, "Usage: %s -f file_in [-w] [-r denom] [-d level]\n"
 									"   -f in_file: set the name of an input file to \"file_in\"\n"
 									"   -w:         input file is in WAV format\n"
+									"   -r denom:   set Octave bands control to [1/denom] (must be in range [1; 24] by standard ISO)\n"
+									"        (default value is 1)\n"
 									"   -d level:   changes debug level to \"level\", smaller value means more info\n"
 									"        (default value is 90, maximum is 100)\n", program_name);
 	exit (ERROR_EXIT_CODE);
@@ -208,8 +210,12 @@ int main(int argc, char **argv) {
 	int opt;
 	int f_flag=0;	// read input from file in_file
 	int w_flag=0;	// treat input as file in WAV format
-	char *in_file;// stores name of input file (if f_flag==1)
-	while ((opt = getopt(argc, argv, "f:wd:")) != -1) {
+	int o_flag=0; // write output to file out_file
+	int r_flag=0; // set Octave fraction, default is Octave [1/1]
+	int r_value=1;
+	char *in_file;  // stores name of input file (if f_flag==1)
+	char *out_file; // stores name of output file (if o_flag==1)
+	while ((opt = getopt(argc, argv, "f:wd:o:r:")) != -1) {
 		switch(opt) {
 			case 'f':
 				// set in_file name to the value of the next argument
@@ -220,10 +226,19 @@ int main(int argc, char **argv) {
 				// read in_file as WAV sound file
 				w_flag = 1;
 				break;
+			case 'o':
+				// write output to out_file in WAV format
+				o_flag = 1;
+				out_file = optarg;
 			case 'd':
 				// get debug level (integer value)
 				debug = atoi(optarg);
 				printf("Changing debug level to %d\n", debug);
+				break;
+			case 'r':
+				// set Octave fraction denominator
+				r_flag = 1;
+				r_value = atoi(optarg);
 				break;
 			case '?':
 				usage();
@@ -249,6 +264,21 @@ int main(int argc, char **argv) {
 		printf("Reading wav input file from \"%s\"...\n", in_file);
 		header = readWav(ins, in_file);
 	}
+
+	struct octave *oct;
+
+	// check if r_value is in correct range
+	if (r_flag != 0 && r_value > 0 && r_value < 25) {
+		printf("Changing to Octave [1/%d] bands\n", r_flag);
+	} else if (r_flag != 0) {
+		fprintf(stderr, "Ignoring r flag.\n");
+		r_value = 1;
+	} 
+	oct = initCenters(1000, r_value);
+
+//TODO: delete
+	exit(0);
+
 
 	printf("Got %d input samples\n", ins->len);
 
@@ -295,10 +325,13 @@ int main(int argc, char **argv) {
 		initDoubles(x, imax);
 		initDoubles(y, imax);
 		re = fft(ins->carrs[i]);
-		int srate = getSampleRate(header);
 //TODO: EXPERIMENTAL
-//		re->max = ilen;
-modulateFreq(re, 2000, srate/2, 0.9, srate);
+		int srate = getSampleRate(header);
+		int pom = re->max;
+		re->max = ilen2;
+//modulateFreq(re, 0, srate/2, 0.0, 0.0, srate);
+flatFreq(re, 3000, 4000/*, srate/2*/, srate);
+		re->max = pom;
 
 		for (j=0; j < ilen2; j++) {
 //			x[j] = j*ilen/ilen2; y[j] = 0;
@@ -339,13 +372,16 @@ modulateFreq(re, 2000, srate/2, 0.9, srate);
 		gnuplot_plot_xy(g, x, y, ilen, "Invers");
 		gnuplot_close(g);
 
-//TODO: EXPERIMENTAL
-		C_ARRS *caso;
-		caso = allocCAS(1);
-		caso->carrs[caso->len++] = ire;
-		writeWav(header, caso, "./output.wav");
-		free(caso->carrs);
-		free(caso);
+//TODO: EXPERIMENTAL: zapis vystupu do WAV souboru
+		if (o_flag == 1) {
+			C_ARRS *caso;
+			caso = allocCAS(1);
+			caso->carrs[caso->len++] = ire;
+			writeWav(header, caso, out_file);
+
+			free(caso->carrs);
+			free(caso);
+		}
 
 		sprintf(fname, "invers_%d.mat", i+1);
 		writeOutput(fname, ire);
@@ -357,6 +393,7 @@ modulateFreq(re, 2000, srate/2, 0.9, srate);
 		freeCA(ire); freeCA(re);
 	}
 	freeHeader(header);
+	freeOctave(oct);
 	freeCAS(ins);
 
 	return (0);
