@@ -94,7 +94,7 @@ void recNext(struct octave *oct, double center) {
  *	 base frequency "base" is usually 1000Hz (standard base for
  *	 ISO Octaves)
  */
-struct octave *initCenters(int base, int frac) {
+struct octave *initOctave(int base, int frac) {
 	struct octave *oct;
 	oct = allocOctave(frac);
 
@@ -111,6 +111,22 @@ struct octave *initCenters(int base, int frac) {
 	}
 
 	return oct;
+}
+
+struct band *getBand(struct octave *oct, int band_id) {
+	printf("%d\n", band_id);
+	if (band_id <= 0 || band_id >= oct->len) {
+					return NULL;
+	}
+
+	int i=0;
+	struct band *b;
+	b = oct->head;
+	while (++i < band_id) {
+		b = b->next;
+	}
+
+	return b;
 }
 
 void freeOctave(struct octave *oct) {
@@ -174,17 +190,6 @@ COMPLEX average(C_ARRAY *ca, int st, int len) {
 	return av;
 }
 
-void flat(C_ARRAY *ca, int st, int tg) {
-	COMPLEX av = average(ca, st, tg-st);
-
-	int i;
-	for (i=st; i<tg; i++) {
-		//ca->c[i].re = av.re;
-		//ca->c[i].im = av.im;
-		setCA(ca, i, av.re, av.im);
-	}
-}
-
 void modulateFreq(C_ARRAY *ca, int st, int tg, double mult, double adit, int srate) {
 	int fst = freqToIndex(st, ca->max, srate);
 	int ftg = freqToIndex(tg, ca->max, srate);
@@ -193,14 +198,36 @@ void modulateFreq(C_ARRAY *ca, int st, int tg, double mult, double adit, int sra
 	modulate(ca, fst, ftg, mult, adit);
 }
 
-void flatFreq(C_ARRAY *ca, int st, int tg, int srate) {
-	int fst = freqToIndex(st, ca->max, srate);
-	int ftg = freqToIndex(tg, ca->max, srate);
+void modulateBand(C_ARRAY *ca, struct octave *oct, int index, double mult, double adit, int srate) {
+	struct band *b;
+	b = getBand(oct, index);
 
-	printf("flat: st=%u, fst=%u; tg=%u, ftg=%u\n", st, fst, tg, ftg);
-	flat(ca, fst, ftg);
+	if (b != NULL) {
+		modulateFreq(ca, b->lowerE, b->upperE, mult, adit, srate);
+	}
 }
 
+void peakBand(C_ARRAY *ca, struct band *b, int srate, double gain) {
+	//TODO: modify ca
+	printf("peakBand from %.2f to %.2f\n", b->lowerE, b->upperE);
+	printf("Uninmplemented method: peakBand");
+}
+
+void flatBand(C_ARRAY *ca, struct band *b, int srate, double gain) {
+	//TODO: compute value for gain
+	COMPLEX av = average(ca, b->lowerE, b->upperE - b->lowerE);
+
+	int i;
+	for (i = b->lowerE; i < b->upperE; i++) {
+		setCA(ca, i, av.re, av.im);
+	}
+}
+
+void nextBand(C_ARRAY *ca, struct band *b, int srate, double gain) {
+	//TODO: modify ca
+	printf("nextBand from %.2f to %.2f\n", b->lowerE, b->upperE);
+	printf("Uninmplemented method: nextBand");
+}
 /*
  *	Counts Fourier transform, also makes scaling
  */

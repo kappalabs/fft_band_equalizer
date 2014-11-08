@@ -79,6 +79,22 @@ static double *allocDoubles(unsigned int len) {
 	return d;
 }
 
+static void usage(void) {
+	fprintf(stderr, "Usage: %s -f in_file [-w] [-r denom] [-k list] [-d level]\n"
+									"   -f in_file: set the name of an input file to \"in_file\"\n\n"
+									"   -w:         input file is in WAV format\n\n"
+									"   -r denom:   set Octave bands control to [1/denom] (must be in range [1; 24] by standard ISO)\n"
+									"        (default value is 1)\n\n"
+									"   -k list:    list defines configuration of virtual knobs separated by commas, every knob has 3 properties:\n"
+									"        band ID:  integer representing specific band, interval depends on choosen Octave fraction (-r option)\n"
+									"        function: must be one of \"f\" for flat, \"p\" for peak, or \"n\" for next\n"
+									"        gain:     integer value from range [-24; 24] (in dB) with, or without its sign\n"
+									"        EXAMPLE:  -k \"1f+20,7n-24,42p+21\" (use flat function applied to the first band with gain 20dB, etc.)\n\n"
+									"   -d level:   changes debug level to \"level\", smaller value means more info\n"
+									"        (default value is 90, used range is [1; 100])\n", program_name);
+	exit (ERROR_EXIT_CODE);
+}
+
 /*
  *	Loads one input sample ~ array of real numbers into
  *	 C_ARRAY structure. Skips empty lines and everything
@@ -190,15 +206,96 @@ static void writeOutput(char *file_name, C_ARRAY *ca) {
 	}
 }
 
-static void usage(void) {
-	fprintf(stderr, "Usage: %s -f file_in [-w] [-r denom] [-d level]\n"
-									"   -f in_file: set the name of an input file to \"file_in\"\n"
-									"   -w:         input file is in WAV format\n"
-									"   -r denom:   set Octave bands control to [1/denom] (must be in range [1; 24] by standard ISO)\n"
-									"        (default value is 1)\n"
-									"   -d level:   changes debug level to \"level\", smaller value means more info\n"
-									"        (default value is 90, maximum is 100)\n", program_name);
-	exit (ERROR_EXIT_CODE);
+
+/*
+ *	Structure used to save all modification that will
+ *	 be applied in linked list - LL
+ */
+struct b_modif {
+	// C_ARRAY *sample, int srate, double gain [-24,+24]
+	void (*modif_f)(C_ARRAY *, struct band *, int, double);
+	// which band will be modified
+	int band_id;
+	double gain;
+	// pointer to allocated Octave structure
+	struct octave *oct;
+	// next operation in LL - linked list
+	struct b_modif *next;
+};
+
+/*
+ *	Adds new modification to the linked list structure
+ */
+void addModif(struct b_modif *head, char func, int band_id, double gain, struct octave *oct) {
+	struct b_modif *nbm;
+	if ((nbm = (struct b_modif *) malloc(sizeof(struct b_modif))) == NULL) {
+		perror("malloc");
+	}
+	nbm->band_id = band_id;
+	nbm->gain = gain;
+	nbm->oct = oct;
+	nbm->next = NULL;
+
+	switch (func) {
+		case 'p':
+						nbm->modif_f = peakBand;
+						break;
+		case 'f':
+						nbm->modif_f = flatBand;
+						break;
+		case 'n':
+						nbm->modif_f = nextBand;
+						break;
+		default:
+						fprintf(stderr, "Unknown modification function");
+						usage();
+						break;
+	}
+
+	if (head == NULL) {
+		head = nbm;
+	} else {
+		struct b_modif *akt;
+		akt = head;
+		do {
+			akt = akt->next;
+		} while (akt->next != NULL);
+		akt->next = nbm;
+	}
+}
+
+/*
+ *	Parse option inputs and appropriately initialize
+ *	 b_modif as LL of these modifications.
+ */
+initModifs(struct b_modif *head, STRING bands_in) {
+//TODO: format bude -t1f+24,5m-18,6p20,9n-18
+	int i;
+	while (i < bands_in.len) {
+		char akt;
+		while ((akt = bands_in.text[i]) != ',') {
+			//while ((akt = bands_in[++i]) != '=') {
+				struct b_oper *nb;
+				//addModif(*head, func_char, (int)akt, gain, *octave);
+				
+				//TODO: cteni operace, optiony operace
+			//}
+		}
+	}
+}
+
+/*
+ *	Execute all of the modifications in the b_modif LL
+ */
+void processModifs(struct b_modif *head, C_ARRAY *ca, int srate) {
+	struct b_modif *actb;
+	actb = head;
+	// go throught all of them and make the modification
+	while (actb != NULL) {
+		struct band *bnd = getBand(actb->oct, actb->band_id);
+		actb->modif_f(ca, bnd, srate, actb->gain);
+		actb = actb->next;
+	}
 }
 
 int main(int argc, char **argv) {
@@ -274,10 +371,7 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "Ignoring r flag.\n");
 		r_value = 1;
 	} 
-	oct = initCenters(1000, r_value);
-
-//TODO: delete
-	exit(0);
+	oct = initOctave(1000, r_value);
 
 
 	printf("Got %d input samples\n", ins->len);
@@ -330,7 +424,10 @@ int main(int argc, char **argv) {
 		int pom = re->max;
 		re->max = ilen2;
 //modulateFreq(re, 0, srate/2, 0.0, 0.0, srate);
-flatFreq(re, 3000, 4000/*, srate/2*/, srate);
+//flatFreq(re, 3000, 4000/*, srate/2*/, srate);
+		for (j=0; j < oct->len; j++) {
+			modulateBand(re, oct, j, 0.001, 0.0, srate);
+		}
 		re->max = pom;
 
 		for (j=0; j < ilen2; j++) {

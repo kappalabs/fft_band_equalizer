@@ -19,11 +19,16 @@ struct octave {
 };
 
 
-extern void modulate(C_ARRAY *ca, int st, int tg, double mult, double adit);
-extern void modulateFreq(C_ARRAY *ca, int st, int tg, double mult, double adit, int sample_rate);
-extern void flatFreq(C_ARRAY *ca, int st, int tg, int srate);
+extern struct band *getBand(struct octave *oct, int band_id);
 
-extern struct octave *initCenters(int from, int frac);
+extern void peakBand(C_ARRAY *samples, struct band *b, int sample_rate, double gain);
+extern void flatBand(C_ARRAY *samples, struct band *b, int sample_rate, double gain);
+extern void nextBand(C_ARRAY *samples, struct band *b, int sample_rate, double gain);
+
+//TODO: MP nepotrebna
+extern void modulateBand(C_ARRAY *ca, struct octave *oct, int index, double mult, double adit, int srate);
+
+extern struct octave *initOctave(int from, int frac);
 extern void freeOctave(struct octave *oct);
 
 extern C_ARRAY *fft(C_ARRAY *ca);
