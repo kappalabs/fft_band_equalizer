@@ -18,8 +18,9 @@
 #include "wave.h"
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 // Size of one window (# of samples to transform in one step)
-#define WLEN 4096
+#define WLEN (4096*1)
 
 #define DEBUG 90
 static int debug = 0;
@@ -503,11 +504,45 @@ int main(int argc, char **argv) {
 		for (w_i=0; w_i < win_num; w_i++) {
 			copyCA(ins->carrs[i], w_i*WLEN, win, 0, WLEN);
 			win->max = WLEN;
-			win->len = MIN(WLEN, abs(ilen - w_i*WLEN));
+			win->len = MIN(WLEN, ilen - w_i*WLEN);
+			printf("win->len = %d\n", win->len);
+
+		g = gnuplot_init();
+		gnuplot_cmd(g, "set terminal png");
+		gnuplot_cmd(g, "set output \"windowing_%d.png\"", w_i+1);
+		gnuplot_setstyle(g, "lines");
+		for (j=0; j < win->len; j++) {
+			x[j] = j;
+			y[j] = win->c[j].re;
+		}
+		gnuplot_plot_xy(g, x, y, win->len, "Before func");
+		gnuplot_close(g);
+
+			//hammingWindow(win, 0.53836, 0.46164);
+			planckWindow(win, 0.0001);
+			//tukeyWindow(win, 0.0001);
+
+		g = gnuplot_init();
+		gnuplot_cmd(g, "set terminal png");
+		gnuplot_cmd(g, "set output \"windowing_%d_.png\"", w_i+1);
+		gnuplot_setstyle(g, "lines");
+		for (j=0; j < win->len; j++) {
+			x[j] = j;
+			y[j] = win->c[j].re;
+		}
+		gnuplot_plot_xy(g, x, y, win->len, "Window func");
+		gnuplot_close(g);
+
 			re = fft(win);
 			processModifs(modifs_head, re, oct, getSampleRate(header));
 			ire = ifft(re);
-			copyCA(ire, 0, wav_out, w_i*WLEN, MIN(WLEN, abs(ilen - w_i*WLEN)));
+			copyCA(ire, 0, wav_out, w_i*WLEN, MIN(WLEN, ilen - w_i*WLEN));
+			//TODO: EXPERIMENTAL Smoothing
+			int gap = w_i*WLEN;
+			wav_out->c[0] = wav_out->c[1];
+			wav_out->c[wav_out->len-1] = wav_out->c[wav_out->len-2];
+			wav_out->c[gap].re = (wav_out->c[MAX(gap-2, 0)].re + wav_out->c[gap+1].re)/2.0;
+
 			printf("copy do wav_out od %d, %d prvku\n", w_i*WLEN, WLEN);
 			freeCA(ire); freeCA(re);
 		}

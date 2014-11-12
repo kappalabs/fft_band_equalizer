@@ -36,6 +36,10 @@ extern void nextBand(C_ARRAY *samples, struct band *b, int sample_rate, double g
 extern struct octave *initOctave(int from, int frac);
 extern void freeOctave(struct octave *oct);
 
+extern void hammingWindow(C_ARRAY *ca, double alpha, double beta);
+extern void planckWindow(C_ARRAY *ca, double epsilon);
+extern void tukeyWindow(C_ARRAY *ca, double alpha);
+
 extern C_ARRAY *fft(C_ARRAY *ca);
 extern C_ARRAY *ifft(C_ARRAY *ca);
 extern C_ARRAY *recFFT(C_ARRAY *ca);

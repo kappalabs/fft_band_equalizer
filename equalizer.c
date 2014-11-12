@@ -258,6 +258,49 @@ void nextBand(C_ARRAY *ca, struct band *b, int srate, double gain) {
 		setCA(ca, i, nc.re, nc.im);
 	}
 }
+
+void hammingWindow(C_ARRAY *ca, double alpha, double beta) {
+	int i;
+	for (i=0; i<ca->len; i++) {
+		ca->c[i].re *= alpha - beta*cos((2.0*M_PI*i)/(ca->len-1));
+	}
+}
+
+double zet(int n, double epsilon, int sgn, int N) {
+	double ret;
+	ret = 2.0*epsilon*(1.0/(1.0 + (sgn*2.0*n)/(N-1)) + 1.0/(1.0 - 2.0*epsilon + (sgn*2.0*n)/(N-1)));
+
+	return ret;
+}
+
+void planckWindow(C_ARRAY *ca, double epsilon) {
+	int i;
+	for (i=0; i<ca->len; i++) {
+		if (i < ca->len*epsilon) {
+			double v;
+			v = 1.0/(pow(M_E, zet(i-ca->len/2, epsilon, 1.0, ca->len))+1.0);
+			ca->c[i].re *= v;
+		} else if (i > ca->len*(1-epsilon)) {
+			ca->c[i].re *= 1.0/(pow(M_E, zet(i-ca->len/2, epsilon, -1.0, ca->len))+1.0);
+		}
+	}
+}
+
+double tukey(int n, double alpha, int climb, int len) {
+	return 1.0/2.0*(1.0 + cos(M_PI*((2.0*n)/(alpha*(len-1.0)) -1.0 + (1.0-climb)*(-2.0/alpha + 2.0))));
+}
+
+void tukeyWindow(C_ARRAY *ca, double alpha) {
+	int i;
+	for (i=0; i<ca->len; i++) {
+		if (i < (alpha*(ca->len-1))/2) {
+			ca->c[i].re *= tukey(i, alpha, 1.0, ca->len/1); 
+		} else if (i > (ca->len-1)*(1-alpha/2)) {
+			ca->c[i].re *= tukey(i, alpha, 0, ca->len/1); 
+		}
+	}
+}
+
 /*
  *	Counts Fourier transform, also makes scaling
  */
