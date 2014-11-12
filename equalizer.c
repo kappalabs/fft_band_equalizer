@@ -207,9 +207,19 @@ void modulateBand(C_ARRAY *ca, struct octave *oct, int index, double mult, doubl
 }
 
 void peakBand(C_ARRAY *ca, struct band *b, int srate, double gain) {
-	//TODO: modify ca
-	printf("peakBand from %.2f to %.2f\n", b->lowerE, b->upperE);
-	printf("Uninmplemented method: peakBand");
+	int fst = freqToIndex(b->lowerE, ca->max, srate);
+	int ftg = freqToIndex(b->upperE, ca->max, srate);
+
+	printf("peakBand from %.2fHz to %.2fHz with gain %.2fdB\n", b->lowerE, b->upperE, gain);
+	printf("fst = %d, ftg = %d\n", fst, ftg);
+
+	double aktgain;
+	int i;
+	for (i=fst; i < ftg; i++) {
+		aktgain = gain - (gain/pow((ftg-fst)/2, 2))*pow(i-fst-(ftg-fst)/2, 2);
+		COMPLEX nc = gainToComplex(ca->c[i], aktgain);
+		setCA(ca, i, nc.re, nc.im);
+	}
 }
 
 void flatBand(C_ARRAY *ca, struct band *b, int srate, double gain) {
@@ -217,7 +227,6 @@ void flatBand(C_ARRAY *ca, struct band *b, int srate, double gain) {
 	int ftg = freqToIndex(b->upperE, ca->max, srate);
 
 	printf("flatBand from %.2fHz to %.2fHz with gain %.2fdB\n", b->lowerE, b->upperE, gain);
-
 	printf("fst = %d, ftg = %d\n", fst, ftg);
 
 	int i;
