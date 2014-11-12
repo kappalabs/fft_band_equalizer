@@ -64,6 +64,24 @@ double decibel(COMPLEX comp) {
 	return 20*log10(magnitude(comp));
 }
 
+/*
+ *	Returns COMPLEX number with parts set so that decibel
+ *	 value is moved with value gain from previous.
+ */
+COMPLEX gainToComplex(COMPLEX cin, double gain) {
+	COMPLEX cret;
+	double aktdec = decibel(cin);
+	double MC = 1.0;
+	if (cin.im != 0 || cin.re == 0) {
+		MC = sqrt(pow(10.0, gain*0.1));
+	}
+	cret.re = cin.re * MC;
+	cret.im = cin.im * MC;
+
+	printf("before=%.2fdB after=%.2fdB, dif = %.2f\n", aktdec, decibel(cret), decibel(cret)-aktdec);
+	return cret;
+}
+
 void formatComplex(COMPLEX c, char *str) {
 	sprintf(str, "(%.3f; %.3fi)", c.re, c.im);
 }
@@ -131,6 +149,17 @@ void freeCA(C_ARRAY *ca) {
 	ca = NULL;
 }
 
+/*
+ *	Copy "len" elements from "ca_in" starting at index "st_in" to
+ *	 array "ca_out" starting from index "st_out"
+ */
+void copyCA(C_ARRAY *ca_in, int st_in, C_ARRAY *ca_out, int st_out, int len) {
+	int i;
+	for (i=0; i<len; i++) {
+		ca_out->c[i+st_out] = ca_in->c[st_in+i];
+	}
+	ca_out->len += len;
+}
 
 /*
  *	FUNCTIONS FOR WORK WITH ARRAY OF COMPLEX SAMPLES

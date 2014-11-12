@@ -16,6 +16,8 @@ struct element {
 
 extern int getNumChannels(struct element *h);
 extern int getSampleRate(struct element *h);
+extern int getSubchunk2Size(struct element *h);
+
 extern struct element *readWav(C_ARRS *cas, char *path);
 extern void freeHeader(struct element *header);
 extern void writeWav(struct element *h, C_ARRS *cas, char *fpath);

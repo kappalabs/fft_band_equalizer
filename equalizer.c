@@ -114,8 +114,7 @@ struct octave *initOctave(int base, int frac) {
 }
 
 struct band *getBand(struct octave *oct, int band_id) {
-	printf("%d\n", band_id);
-	if (band_id <= 0 || band_id >= oct->len) {
+	if (band_id <= 0 || band_id > oct->len) {
 					return NULL;
 	}
 
@@ -214,12 +213,17 @@ void peakBand(C_ARRAY *ca, struct band *b, int srate, double gain) {
 }
 
 void flatBand(C_ARRAY *ca, struct band *b, int srate, double gain) {
-	//TODO: compute value for gain
-	COMPLEX av = average(ca, b->lowerE, b->upperE - b->lowerE);
+	int fst = freqToIndex(b->lowerE, ca->max, srate);
+	int ftg = freqToIndex(b->upperE, ca->max, srate);
+
+	printf("flatBand from %.2fHz to %.2fHz with gain %.2fdB\n", b->lowerE, b->upperE, gain);
+
+	printf("fst = %d, ftg = %d\n", fst, ftg);
 
 	int i;
-	for (i = b->lowerE; i < b->upperE; i++) {
-		setCA(ca, i, av.re, av.im);
+	for (i=fst; i < ftg; i++) {
+		COMPLEX nc = gainToComplex(ca->c[i], gain);
+		setCA(ca, i, nc.re, nc.im);
 	}
 }
 

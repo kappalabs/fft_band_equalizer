@@ -14,6 +14,8 @@ extern STRING *allocStr(unsigned int length);
 extern void reallocStr(STRING *s, unsigned int nlen);
 extern void freeStr(STRING *s);
 
+extern void append(char *str, char c);
+
 extern void initString(char *str, unsigned int length);
 extern char *allocString(unsigned int length);
 

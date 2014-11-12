@@ -34,6 +34,7 @@ extern COMPLEX complexAdd(COMPLEX c1, COMPLEX c2);
 extern COMPLEX complexSub(COMPLEX c1, COMPLEX c2);
 extern COMPLEX complexMult(COMPLEX c1, COMPLEX c2);
 extern COMPLEX polarToComplex(double r, double fi);
+extern COMPLEX gainToComplex(COMPLEX cin, double gain);
 
 extern double getRe(COMPLEX comp);
 extern double getIm(COMPLEX comp);
@@ -48,6 +49,7 @@ extern void initCA(C_ARRAY *ca, unsigned int len, unsigned int start);
 extern C_ARRAY *allocCA(unsigned int len);
 extern void reallocCA(C_ARRAY *ca, unsigned int len);
 extern void freeCA(C_ARRAY *ca);
+extern void copyCA(C_ARRAY *ca_in, int st_in, C_ARRAY *ca_out, int st_out, int len);
 
 extern C_ARRS *initCAS(C_ARRS *cas, unsigned int len);
 extern C_ARRS *allocCAS(unsigned int len);

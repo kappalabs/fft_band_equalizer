@@ -17,6 +17,9 @@
 #include "string.h"
 #include "wave.h"
 
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+// Size of one window (# of samples to transform in one step)
+#define WLEN 4096
 
 #define DEBUG 90
 static int debug = 0;
@@ -216,9 +219,8 @@ struct b_modif {
 	void (*modif_f)(C_ARRAY *, struct band *, int, double);
 	// which band will be modified
 	int band_id;
+	// what will be the gain passed into the modification function
 	double gain;
-	// pointer to allocated Octave structure
-	struct octave *oct;
 	// next operation in LL - linked list
 	struct b_modif *next;
 };
@@ -226,15 +228,24 @@ struct b_modif {
 /*
  *	Adds new modification to the linked list structure
  */
-void addModif(struct b_modif *head, char func, int band_id, double gain, struct octave *oct) {
+struct b_modif *addModif(struct b_modif *head, struct octave *oct, char func, int band_id, double gain) {
+	printf("New modifier: func=%c band_id=%d gain=%.2fdB\n", func, band_id, gain);
 	struct b_modif *nbm;
 	if ((nbm = (struct b_modif *) malloc(sizeof(struct b_modif))) == NULL) {
 		perror("malloc");
 	}
+
+	if (band_id < 1 || band_id > oct->len) {
+		fprintf(stderr, "Band ID is out of range [1; %d]\n", oct->len);
+		usage();
+	}
 	nbm->band_id = band_id;
+	if (gain < -24.0 || gain > 24.0) {
+		fprintf(stderr, "Gain is out of range [-24; 24]dB\n");
+		usage();
+	}
 	nbm->gain = gain;
-	nbm->oct = oct;
-	nbm->next = NULL;
+	nbm->next = head;
 
 	switch (func) {
 		case 'p':
@@ -247,54 +258,89 @@ void addModif(struct b_modif *head, char func, int band_id, double gain, struct 
 						nbm->modif_f = nextBand;
 						break;
 		default:
-						fprintf(stderr, "Unknown modification function");
+						fprintf(stderr, "Unknown modification function\n");
 						usage();
 						break;
 	}
 
-	if (head == NULL) {
-		head = nbm;
-	} else {
-		struct b_modif *akt;
-		akt = head;
-		do {
-			akt = akt->next;
-		} while (akt->next != NULL);
-		akt->next = nbm;
-	}
+	return nbm;
 }
 
 /*
  *	Parse option inputs and appropriately initialize
  *	 b_modif as LL of these modifications.
+ *	Assume the input is in correct format.
  */
-initModifs(struct b_modif *head, STRING bands_in) {
-//TODO: format bude -t1f+24,5m-18,6p20,9n-18
-	int i;
-	while (i < bands_in.len) {
-		char akt;
-		while ((akt = bands_in.text[i]) != ',') {
-			//while ((akt = bands_in[++i]) != '=') {
-				struct b_oper *nb;
-				//addModif(*head, func_char, (int)akt, gain, *octave);
-				
-				//TODO: cteni operace, optiony operace
-			//}
+struct b_modif *initModifs(struct b_modif *head, struct octave *oct, char *bands_in) {
+//TODO: priklad formatu vstupu: 1f+24,5n-18,6p20,9n-18
+	int i=0;
+	char akt;
+	char *token = allocString(20);
+	int band_id;
+	char func;
+	int gain;
+	while ((akt = bands_in[i++]) != '\0' && i < strlen(bands_in)) {
+		// first we read band_id, which is integer
+		initString(token, 20);
+		while (akt >= '0' && akt <= '9') {
+			append(token, akt);
+			akt = bands_in[i++];
 		}
+		band_id = atoi(token);
+
+		// now read charasteristic character of function to be used
+		func = akt;
+		akt = bands_in[i++];
+
+		// now read the gain number
+		initString(token, 20);
+		if (akt == '+' || akt == '-' || (akt >= '0' && akt <= '9')) {
+			append(token, akt);
+			akt = bands_in[i++];
+		} else {
+			// the only thing we check for (might be unclear for users)
+			fprintf(stderr, "Incorrect sign before gain number\n");
+			usage();
+		}
+		// read the rest of the gain number (if exists)
+		while (akt >= '0' && akt <= '9') {
+			append(token, akt);
+			akt = bands_in[i++];
+		}
+		gain = atoi(token);
+
+		head = addModif(head, oct, func, band_id, gain);
 	}
+	free(token);
+
+	return head;
 }
 
 /*
  *	Execute all of the modifications in the b_modif LL
  */
-void processModifs(struct b_modif *head, C_ARRAY *ca, int srate) {
+void processModifs(struct b_modif *head, C_ARRAY *ca, struct octave *oct, int srate) {
 	struct b_modif *actb;
 	actb = head;
 	// go throught all of them and make the modification
 	while (actb != NULL) {
-		struct band *bnd = getBand(actb->oct, actb->band_id);
+		struct band *bnd = getBand(oct, actb->band_id);
+		printf("Processing modification of %d. band with gain %.2f\n", actb->band_id, actb->gain);
 		actb->modif_f(ca, bnd, srate, actb->gain);
 		actb = actb->next;
+	}
+}
+
+/*
+ *	Free allocated space on heap
+ */
+void freeModifs(struct b_modif *head) {
+	struct b_modif *prev, *pom;
+	pom = head;
+	while (pom != NULL) {
+		prev = pom;
+		pom = pom->next;
+		free(prev);
 	}
 }
 
@@ -309,12 +355,19 @@ int main(int argc, char **argv) {
 	int w_flag=0;	// treat input as file in WAV format
 	int o_flag=0; // write output to file out_file
 	int r_flag=0; // set Octave fraction, default is Octave [1/1]
-	int r_value=1;
+	int k_flag=0; // settings of virtual knots
+	int r_value=1;  // stores fraction value, default is 1
+	char *k_value;  // stores settings of virtual knots
 	char *in_file;  // stores name of input file (if f_flag==1)
 	char *out_file; // stores name of output file (if o_flag==1)
-	while ((opt = getopt(argc, argv, "f:wd:o:r:")) != -1) {
+	// Read and process all options given to this program
+	while ((opt = getopt(argc, argv, "f:wd:o:r:k:")) != -1) {
 		switch(opt) {
 			case 'f':
+				if (f_flag != 0) {
+					fprintf(stderr, "Only one input file is required\n");
+					usage();
+				}
 				// set in_file name to the value of the next argument
 				f_flag = 1;
 				in_file = optarg;
@@ -324,6 +377,10 @@ int main(int argc, char **argv) {
 				w_flag = 1;
 				break;
 			case 'o':
+				if (o_flag != 0) {
+					fprintf(stderr, "Only one output file is required\n");
+					usage();
+				}
 				// write output to out_file in WAV format
 				o_flag = 1;
 				out_file = optarg;
@@ -337,6 +394,15 @@ int main(int argc, char **argv) {
 				r_flag = 1;
 				r_value = atoi(optarg);
 				break;
+			case 'k':
+				if (k_flag != 0) {
+					fprintf(stderr, "Only one set of virtual knots configuration is allowed\n");
+					usage();
+				}
+				// prepare modification functions
+				k_flag = 1;
+				k_value = optarg;
+				break;
 			case '?':
 				usage();
 				break;
@@ -349,6 +415,9 @@ int main(int argc, char **argv) {
 		usage();
 	}
 
+	/*
+	 *	Stores all information from given WAV file header
+	 */
 	struct element *header;
 
 	// w_flag was not set, read in_file as raw input data ~ default
@@ -362,9 +431,13 @@ int main(int argc, char **argv) {
 		header = readWav(ins, in_file);
 	}
 
+	/* Stores information about selected Octave, which includes
+	 *  number of all bands, selected fraction and bands itself
+	 *   as Bands elements in linked list.
+	 */
 	struct octave *oct;
 
-	// check if r_value is in correct range
+	// Check if r_value is in correct range
 	if (r_flag != 0 && r_value > 0 && r_value < 25) {
 		printf("Changing to Octave [1/%d] bands\n", r_flag);
 	} else if (r_flag != 0) {
@@ -373,29 +446,41 @@ int main(int argc, char **argv) {
 	} 
 	oct = initOctave(1000, r_value);
 
+	/*
+	 *	Stores all modifications given by virtual knobs parsed
+	 *	 from option "-k"
+	 */
+	struct b_modif *modifs_head;
+	modifs_head = NULL;
 
+	// Parse input virtual knots configuration
+	if (k_flag != 0) {
+		modifs_head = initModifs(modifs_head, oct, k_value);
+	}
+
+	
 	printf("Got %d input samples\n", ins->len);
 
 	gnuplot_ctrl * g;
-	C_ARRAY *re, *ire;
+	C_ARRAY *re, *ire;	// For temporary storing FFT and IFFT
+	C_ARRAY *win;	// Window for WLEN samples, works as kind of buffer
+	win = allocCA(WLEN);
+	C_ARRAY *wav_out;
+
 	int i, j;
+	// For every channel of given WAV file
+	//  or every row of data from raw data file
 	for (i=0; i < ins->len; i++) {
-		// input samples must have length equal to power of 2
-		//ins->carrs[i]->len = getPow(ins->carrs[i]->len, 2);
 		int ilen = ins->carrs[i]->len;
-		int ilen2 = getPow(ilen, 2); //ins->carrs[i]->len;
+		int ilen2 = getPow(ilen, 2);
 		int imax = ins->carrs[i]->max;
-		//TODO: vyresit rozsamplovani po castech 4096
-//		ilen = 4096;
-//		ilen2 = ilen;
-//		imax = ilen;
 		double *x = allocDoubles(imax);
 		double *y = allocDoubles(imax);
 
 		g = gnuplot_init();
 		gnuplot_cmd(g, "set terminal png");
 		gnuplot_setstyle(g, "lines");
-		printf("INPUT %d, length->^2 of %d:\n", i+1, ilen2);
+		printf("INPUT %d, #samples: %d length->^2: %d:\n", i+1, ilen, ilen2);
 		gnuplot_cmd(g, "set output \"input_%d.png\"", i+1);
 		for (j=0; j<ilen; j++) {
 			x[j] = j; y[j] = ins->carrs[i]->c[j].re;
@@ -409,88 +494,123 @@ int main(int argc, char **argv) {
 
 
 		/*
-		 *	COUNTS FOURIER TRANSFORM
+		 *	Divide input samples into windows of specific length
 		 */
-		g = gnuplot_init();
-		gnuplot_cmd(g, "set terminal png");
-		printf("OUTPUT FOURIER %d:\n", i+1);
-		gnuplot_cmd(g, "set output \"fourier_%d.png\"", i+1);
-		gnuplot_setstyle(g, "lines");
-		initDoubles(x, imax);
-		initDoubles(y, imax);
-		re = fft(ins->carrs[i]);
-//TODO: EXPERIMENTAL
-		int srate = getSampleRate(header);
-		int pom = re->max;
-		re->max = ilen2;
-//modulateFreq(re, 0, srate/2, 0.0, 0.0, srate);
-//flatFreq(re, 3000, 4000/*, srate/2*/, srate);
-		for (j=0; j < oct->len; j++) {
-			modulateBand(re, oct, j, 0.001, 0.0, srate);
+		wav_out = allocCA(ilen);
+		int win_num = (int) ceil(ilen/WLEN);
+		printf("win_num = %d\n", win_num);
+		int w_i;
+		for (w_i=0; w_i < win_num; w_i++) {
+			copyCA(ins->carrs[i], w_i*WLEN, win, 0, WLEN);
+			win->max = WLEN;
+			win->len = MIN(WLEN, abs(ilen - w_i*WLEN));
+			re = fft(win);
+			processModifs(modifs_head, re, oct, getSampleRate(header));
+			ire = ifft(re);
+			copyCA(ire, 0, wav_out, w_i*WLEN, MIN(WLEN, abs(ilen - w_i*WLEN)));
+			printf("copy do wav_out od %d, %d prvku\n", w_i*WLEN, WLEN);
+			freeCA(ire); freeCA(re);
 		}
-		re->max = pom;
 
-		for (j=0; j < ilen2; j++) {
-//			x[j] = j*ilen/ilen2; y[j] = 0;
-//			double mag = magnitude(re->c[j]);
-//			if (mag==mag) {
-//				y[j] = mag;
-//			}
-			x[j] = j;
-			y[j] = decibel(re->c[j]);
-		}
-		gnuplot_set_ylabel(g, "dBFS");
-		gnuplot_plot_xy(g, x, y, ilen2/2, "Fourier");
-		gnuplot_close(g);
-
-		sprintf(fname, "fourier_%d.mat", i+1);
-		writeOutput(fname, re);
-
-		/*
-		 *	COUNTS INVERS FOURIER TRANSFORM
-		 */
-		g = gnuplot_init();
-		gnuplot_cmd(g, "set terminal png");
-		gnuplot_setstyle(g, "lines");
-		printf("OUTPUT INVERS FOURIER %d:\n", i+1);
-		gnuplot_cmd(g, "set output \"invers_%d.png\"", i+1);
-		initDoubles(x, imax);
-		initDoubles(y, imax);
-		ire = ifft(re);
-		for (j=0; j < ilen; j++) {
-			x[j] = j; y[j] = ire->c[j].re;
-		}
-		char *dc = allocString(32);
-		char *nq = allocString(32);
-		formatComplex(ire->c[0], dc);
-		formatComplex(ire->c[ilen2/2], nq);
-		printf("DC slot = %s, Nyquist slot = %s\n", dc, nq);
-		free(dc); free(nq);
-		gnuplot_plot_xy(g, x, y, ilen, "Invers");
-		gnuplot_close(g);
-
-//TODO: EXPERIMENTAL: zapis vystupu do WAV souboru
+		// Write result to WAV file
 		if (o_flag == 1) {
 			C_ARRS *caso;
 			caso = allocCAS(1);
-			caso->carrs[caso->len++] = ire;
+			caso->carrs[caso->len++] = wav_out;
 			writeWav(header, caso, out_file);
+			printf("caso-wav_out: len=%d, max=%d\n", wav_out->len, wav_out->max);
 
 			free(caso->carrs);
 			free(caso);
 		}
+		g = gnuplot_init();
+		gnuplot_cmd(g, "set terminal png");
+		gnuplot_setstyle(g, "lines");
+		gnuplot_cmd(g, "set output \"wav_out.png\"");
+		initDoubles(x, imax);
+		initDoubles(y, imax);
+		for (j=0; j < wav_out->len; j++) {
+			x[j] = j; y[j] = wav_out->c[j].re;
+		}
+		gnuplot_plot_xy(g, x, y, wav_out->len, "Invers");
+		gnuplot_close(g);
 
-		sprintf(fname, "invers_%d.mat", i+1);
-		writeOutput(fname, ire);
+
+//		/*
+//		 *	COUNTS FOURIER TRANSFORM AND APPLIES EQUALIZATION
+//		 */
+//		g = gnuplot_init();
+//		gnuplot_cmd(g, "set terminal png");
+//		printf("OUTPUT FOURIER %d:\n", i+1);
+//		gnuplot_cmd(g, "set output \"fourier_%d.png\"", i+1);
+//		gnuplot_setstyle(g, "lines");
+//		initDoubles(x, imax);
+//		initDoubles(y, imax);
+//		re = fft(ins->carrs[i]);
+////TODO: EXPERIMENTAL
+//		int pom = re->max;
+//		re->max = ilen2;
+//		processModifs(modifs_head, re, oct, getSampleRate(header));
+//		re->max = pom;
+//
+//		for (j=0; j < ilen2; j++) {
+//			x[j] = j;
+//			y[j] = decibel(re->c[j]);
+//		}
+//		gnuplot_set_ylabel(g, "dBFS");
+//		gnuplot_plot_xy(g, x, y, ilen2/2, "Fourier");
+//		gnuplot_close(g);
+//
+//		sprintf(fname, "fourier_%d.mat", i+1);
+//		writeOutput(fname, re);
+//
+//		/*
+//		 *	COUNTS INVERS FOURIER TRANSFORM
+//		 */
+//		g = gnuplot_init();
+//		gnuplot_cmd(g, "set terminal png");
+//		gnuplot_setstyle(g, "lines");
+//		printf("OUTPUT INVERS FOURIER %d:\n", i+1);
+//		gnuplot_cmd(g, "set output \"invers_%d.png\"", i+1);
+//		initDoubles(x, imax);
+//		initDoubles(y, imax);
+//		ire = ifft(re);
+//		for (j=0; j < ilen; j++) {
+//			x[j] = j; y[j] = ire->c[j].re;
+//		}
+//		char *dc = allocString(32);
+//		char *nq = allocString(32);
+//		formatComplex(ire->c[0], dc);
+//		formatComplex(ire->c[ilen2/2], nq);
+//		printf("DC slot = %s, Nyquist slot = %s\n", dc, nq);
+//		free(dc); free(nq);
+//		gnuplot_plot_xy(g, x, y, ilen, "Invers");
+//		gnuplot_close(g);
+//
+////TODO: EXPERIMENTAL: zapis vystupu do WAV souboru
+//		if (o_flag == 1) {
+//			C_ARRS *caso;
+//			caso = allocCAS(1);
+//			caso->carrs[caso->len++] = ire;
+//			writeWav(header, caso, out_file);
+//
+//			free(caso->carrs);
+//			free(caso);
+//		}
+//
+//		sprintf(fname, "invers_%d.mat", i+1);
+//		writeOutput(fname, ire);
 
 		printf("\n\n");
 
 		free(fname);
 		free(x); free(y);
-		freeCA(ire); freeCA(re);
+		freeCA(wav_out);
 	}
+	freeModifs(modifs_head);
 	freeHeader(header);
 	freeOctave(oct);
+	freeCA(win);
 	freeCAS(ins);
 
 	return (0);

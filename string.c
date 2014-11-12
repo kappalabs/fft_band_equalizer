@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 
 #include "string.h"
 
@@ -27,8 +28,8 @@ STRING *allocStr(unsigned int length) {
 		return NULL;
 	}
 
-	if ((s->text = (char *) malloc(length * sizeof(char))) == NULL) {
-		perror("malloc");
+	if ((s->text = (char *) calloc(length, sizeof(char))) == NULL) {
+		perror("calloc");
 		return NULL;
 	}
 
@@ -55,6 +56,19 @@ void freeStr(STRING *s) {
 }
 
 /*
+ *	FUNCTIONS FOR BASIC STRING OPERATIONS
+ */
+/*
+ *	Appends one char to the end of given string,
+ *	 which must have space for it.
+ */
+void append(char *str, char c) {
+	int len = strlen(str);
+	str[len] = c;
+	str[len+1] = '\0';
+}
+
+/*
  *	FUNCTIONS FOR WORK WITH SIMPLE STRING REPRESENTATION
  */
 /*
@@ -71,12 +85,10 @@ void initString(char *str, unsigned int length) {
 char *allocString(unsigned int length) {
 	char *s;
 
-	if ((s = (char *) malloc(length * sizeof(char))) == NULL) {
-		perror("malloc");
+	if ((s = (char *) calloc(length, sizeof(char))) == NULL) {
+		perror("calloc");
 		return NULL;
 	}
-
-	initString(s, length);
 
 	return s;
 }

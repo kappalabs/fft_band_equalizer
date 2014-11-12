@@ -24,15 +24,15 @@ main.o:	gnuplot_i.o equalizer.o complex.o string.o	#? $(OBJS)
 
 debug:	clean $(PROG)
 #	valgrind 2>valgrind.log --track-origins=yes --leak-check=full --show-leak-kinds=all ./main -d 90 -f sample.in >main.log
-	valgrind 2>valgrind.log --track-origins=yes --leak-check=full --show-leak-kinds=all ./main -f "dve-32.wav" -w >$(PROG).log
+	valgrind 2>valgrind.log --track-origins=yes --leak-check=full --show-leak-kinds=all ./main -f "dve-32.wav" -w -o "output.wav" -k 5f-24 >$(PROG).log
 
 #INFILE = "flute-A4.wav"
-#INFILE = "dve-32.wav"
-INFILE = "singing-female.wav"
+INFILE = "dve-32.wav"
+#INFILE = "singing-female.wav"
 run:	clean $(PROG)
 #	./main -d 80 -f sample.in >main.log
-	./main -f $(INFILE) -w -o "output.wav" >$(PROG).log
-#	./main -f "flute-A4.wav" -w -o "output.wav" >main.log
+	./main -f $(INFILE) -w -o "output.wav" -k 3f-7,2f-2,5f-2,7f-24,8f-24,9f-24,10f-24 >$(PROG).log
+#	./main -f $(INFILE) -w -o "output.wav" -k 2f+2,5f+1,7f+1,8f-24,9f-24,10f-24 >$(PROG).log
 	mplayer $(INFILE) 1>/dev/null
 	mplayer "output.wav" 1>/dev/null
 
