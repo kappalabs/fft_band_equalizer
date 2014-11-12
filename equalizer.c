@@ -237,9 +237,26 @@ void flatBand(C_ARRAY *ca, struct band *b, int srate, double gain) {
 }
 
 void nextBand(C_ARRAY *ca, struct band *b, int srate, double gain) {
-	//TODO: modify ca
-	printf("nextBand from %.2f to %.2f\n", b->lowerE, b->upperE);
-	printf("Uninmplemented method: nextBand");
+	int fst = freqToIndex(b->lowerE, ca->max, srate);
+	int ftg = freqToIndex(b->upperE, ca->max, srate);
+
+	printf("nextBand from %.2fHz to %.2fHz with gain %.2fdB\n", b->lowerE, b->upperE, gain);
+	printf("fst = %d, ftg = %d\n", fst, ftg);
+
+	int nfst = (ftg-fst)/2 + fst;
+	int nftg = (ftg-fst) + nfst;
+
+	double aktgain;
+	int i;
+	for (i=nfst; i < nftg; i++) {
+		// End of samples, no next band to adjust
+		if (ca->len < i) {
+			return;
+		}
+		aktgain = gain*sin(((i-nfst) * (M_PI/2.0))/(nftg-nfst));
+		COMPLEX nc = gainToComplex(ca->c[i], aktgain);
+		setCA(ca, i, nc.re, nc.im);
+	}
 }
 /*
  *	Counts Fourier transform, also makes scaling
