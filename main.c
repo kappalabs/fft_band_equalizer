@@ -93,7 +93,7 @@ static void usage(void) {
 									"        band ID:  integer representing specific band, interval depends on choosen Octave fraction (-r option)\n"
 									"        function: must be one of \"f\" for flat, \"p\" for peak, or \"n\" for next\n"
 									"        gain:     integer value from range [-24; 24] (in dB) with, or without its sign\n"
-									"        EXAMPLE:  -k \"1f+20,7n-24,42p+21\" (use flat function applied to the first band with gain 20dB, etc.)\n\n"
+									"        EXAMPLE:  -k 1f+20,7n-24,42p+21 (use flat function applied to the first band with gain 20dB, etc.)\n\n"
 									"   -d level:   changes debug level to \"level\", smaller value means more info\n"
 									"        (default value is 90, used range is [1; 100])\n", program_name);
 	exit (ERROR_EXIT_CODE);
