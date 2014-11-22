@@ -6,7 +6,7 @@
 #include <string.h>
 #include <math.h>
 
-#include "main.h"
+#include "my_std.h"
 #include "wave.h"
 #include "complex.h"
 
@@ -192,7 +192,7 @@ C_ARRAY *getChannel(int fd, short ch_id) {
 	while (read(fd, buf, B_SIZE) > 0 && r < tns) {
 		// we need more memory for next samples/values
 		if (ca->max - ca->len == 0) {
-			reallocCA(ca, getPow(ca->len + 64, 2));
+			reallocCA(ca, get_pow(ca->len + 64, 2));
 		}
 		r++;
 

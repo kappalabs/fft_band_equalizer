@@ -3,30 +3,30 @@
 #define COMPLEX_H_
 
 /*
- *	Structure represents complex number
+ *  This structure represents single complex number.
  */
 typedef struct {
-	double re;		// real part of this number
-	double im;		// imaginary part of this number
+	double re;   // real part of this number
+	double im;   // imaginary part of this number
 } COMPLEX;
 
 /*
- *	Structure represents array of complex numbers
- *		aka one input sample
+ *  This structure represents array of complex numbers
+ *   useful for one input sound sample.
  */
 typedef struct {
-	COMPLEX *c;				// array of complex numbers
-	unsigned int len;	// length of this array of complex numbers (*c)
-	unsigned int max;	// allocated length of the array (*c)
+	COMPLEX *c;         // array of complex numbers
+	unsigned int len;   // number of COMPLEX numbers in array (*c)
+	unsigned int max;   // allocated length of the array (*c)
 } C_ARRAY;
 
 /*
- *	Structure represents array of samples
+ *  This structure represents array of samples.
  */
 typedef struct {
-	C_ARRAY **carrs;	// array of samples
-	unsigned int len;	// length of this samples array (**carrs)
-	unsigned int max;	// allocated length of the array (**carrs)
+	C_ARRAY **carrs;    // array of samples (sound tracks)
+	unsigned int len;   // number of samples arrays (sound tracks) (**carrs)
+	unsigned int max;   // allocated length of the array (**carrs)
 } C_ARRS;
 
 

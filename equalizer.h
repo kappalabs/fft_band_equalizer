@@ -5,9 +5,11 @@
 #include "complex.h"
 #include "wave.h"
 
+
 /*
- *	One band structure has information about specific band
- *	 in Octave, which is controllable. Variables are in Hz units
+ *  One band structure contains information about specific band
+ *   of frequencies, which are controllable together. Variables
+ *   are in Hz units.
  */
 struct band {
 	double center;
@@ -16,14 +18,15 @@ struct band {
 	struct band *next;
 };
 
-/* Stores informations about selected Octave, which includes
- *  number of all bands, selected fraction and bands itself
- *   as linked list
+/*  
+ *  Stores informations about selected Octave, which includes
+ *   number of all bands, selected fraction and bands itself
+ *   as a linked list.
  */
 struct octave {
-	struct band *head;	// Head of linked list
-	int frac;	// Selected Octave fraction (bigger means more bands to control)
-	int len;	// Number of elements in linked list
+	struct band *head;  // Head of the linked list
+	int frac;           // Selected Octave fraction (bigger means more bands to control)
+	int len;            // Number of elements in linked list
 };
 
 
@@ -39,6 +42,7 @@ extern void freeOctave(struct octave *oct);
 extern void hammingWindow(C_ARRAY *ca, double alpha, double beta);
 extern void planckWindow(C_ARRAY *ca, double epsilon);
 extern void tukeyWindow(C_ARRAY *ca, double alpha);
+extern void smooth(C_ARRAY *ca, int st, int tg);
 
 extern C_ARRAY *fft(C_ARRAY *ca);
 extern C_ARRAY *ifft(C_ARRAY *ca);

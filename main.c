@@ -8,61 +8,22 @@
 #include <errno.h>
 #include <ctype.h>
 
-// interpret data in chart
+// Interpret data in chart
 #include "gnuplot_i.h"
 // My header files
-#include "main.h"
+#include "my_std.h"
 #include "equalizer.h"
 #include "complex.h"
 #include "string.h"
 #include "wave.h"
 
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 // Size of one window (# of samples to transform in one step)
 #define WLEN (4096*1)
 
-#define DEBUG 90
-static int debug = 0;
-#ifdef DEBUG
-void logOut(char *s, int level, int rec) {
-	if (level > debug) {
-		int i; 
-		int indl = 128;
-		char *r_s = allocString(indl);
-		for (i=0; i<rec; i++) strcat(r_s, "    ");
 
-		(strlen(s)>0) ? (printf("%s%s", r_s, s)) : (printf("%s", s));
-		free(r_s);
-	}
-}
-#endif
-#ifndef DEBUG
-void logOut(char *s, int level, int rec) {}
-#endif
-
-// this will store name of this program
+// Stores the name of this program
 char const * program_name;
 
-/*
- *	Returns 1 if given integer "val" is power of 2, 0 otherwise.
- */
-int isPowOf2(int val) {
-	return (val & (val-1)) == 0;
-}
-
-/*
- *	Returns nearest power of integer value "base", which is bigger
- *	 or equal to given value "val".
- */
-int getPow(int val, int base) {
-	int nearest = 1;	// initialization to the first power of every integer
-	while (nearest < val) {
-		nearest *= base;
-	}
-
-	return nearest;
-}
 
 static void initDoubles(double *ds, unsigned int len) {
 	int i;
@@ -140,7 +101,7 @@ static C_ARRAY *readLine(FILE *fin) {
 			double din = atof(token->text);
 			// we need to allocate space for few more numbers
 			if (in_arr->max - in_arr->len <= 20) {
-				reallocCA(in_arr, getPow(in_arr->len + 512, 2));
+				reallocCA(in_arr, get_pow(in_arr->len + 512, 2));
 			}
 			in_arr->c[in_arr->len].re = din;
 			in_arr->len++;
@@ -385,6 +346,7 @@ int main(int argc, char **argv) {
 				// write output to out_file in WAV format
 				o_flag = 1;
 				out_file = optarg;
+				break;
 			case 'd':
 				// get debug level (integer value)
 				debug = atoi(optarg);
@@ -473,7 +435,7 @@ int main(int argc, char **argv) {
 	//  or every row of data from raw data file
 	for (i=0; i < ins->len; i++) {
 		int ilen = ins->carrs[i]->len;
-		int ilen2 = getPow(ilen, 2);
+		int ilen2 = get_pow(ilen, 2);
 		int imax = ins->carrs[i]->max;
 		double *x = allocDoubles(imax);
 		double *y = allocDoubles(imax);
@@ -519,7 +481,7 @@ int main(int argc, char **argv) {
 		gnuplot_close(g);
 
 			//hammingWindow(win, 0.53836, 0.46164);
-			planckWindow(win, 0.0001);
+			planckWindow(win, 0.1);
 			//tukeyWindow(win, 0.0001);
 
 		g = gnuplot_init();
@@ -538,10 +500,10 @@ int main(int argc, char **argv) {
 			ire = ifft(re);
 			copyCA(ire, 0, wav_out, w_i*WLEN, MIN(WLEN, ilen - w_i*WLEN));
 			//TODO: EXPERIMENTAL Smoothing
-			int gap = w_i*WLEN;
-			wav_out->c[0] = wav_out->c[1];
-			wav_out->c[wav_out->len-1] = wav_out->c[wav_out->len-2];
-			wav_out->c[gap].re = (wav_out->c[MAX(gap-2, 0)].re + wav_out->c[gap+1].re)/2.0;
+//			int gap = w_i*WLEN;
+//			wav_out->c[0] = wav_out->c[1];
+//			wav_out->c[wav_out->len-1] = wav_out->c[wav_out->len-2];
+//			wav_out->c[gap].re = (wav_out->c[MAX(gap-2, 0)].re + wav_out->c[gap+1].re)/2.0;
 
 			printf("copy do wav_out od %d, %d prvku\n", w_i*WLEN, WLEN);
 			freeCA(ire); freeCA(re);
