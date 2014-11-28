@@ -11,106 +11,119 @@
 #include "complex.h"
 
 #define HEADER_SIZE 13
-/*
- *	Standard WAVE format header
- */
-struct element header[HEADER_SIZE] = {
-				{1, 0, 4, "ChunkID", 0},       // 0; RIFF or RIFX, RIFX means that default is big endian
-				{0, 4, 4, "ChunkSize", 0},     // 1;
-				{1, 8, 4, "Format", 0},        // 2; should be text "WAVE" = 57 41 56 45
-				{1, 12, 4, "Subchunk1ID", 0},  // 3; should be text "fmt" = 66 6D 74 20
-				{0, 16, 4, "Subchunk1Size", 0},// 4; 16 if PCM is used
-				{0, 20, 2, "AudioFormat", 0},  // 5; 1 ~ PCM, otherwise, there is some kind of compression in data chunk
-				{0, 22, 2, "NumChannels", 0},  // 6; 1 ~ mono, 2 ~ stereo
-				{0, 24, 4, "SampleRate", 0},   // 7;
-				{0, 28, 4, "ByteRate", 0},     // 8;
-				{0, 32, 2, "BlockAlign", 0},   // 9; # of bytes for one sample
-				{0, 34, 2, "BitsPerSample", 0},// 10;
-				{1, 36, 4, "Subchunk2ID", 0},  // 11; should be text "data"
-				{0, 40, 4, "Subchunk2Size", 0} // 12; # of bytes in the rest of the file
-};
+// Byte value of few strings
+#define RIFF 0x52494646
+#define RIFX 0x52494658
+#define WAVE 0x57415645
+
+#define LESS_SET(a, b) if ((a) < (b)) { (b) = (a); }
+#define MORE_SET(a, b) if ((a) > (b)) { (b) = (a); }
 
 /*
- *	Returns converted input int array in specified endian format
- *	 into simple integer value
+ *  Standard WAVE format header
  */
-int toInt(char *data, int size, short int endian) {
-	int ret = 0;
+struct element header[HEADER_SIZE] = {
+	{BE, 0, 4, "ChunkID", 0},       // 0; RIFF or RIFX, RIFX means that default is big endian
+	{LE, 4, 4, "ChunkSize", 0},     // 1;
+	{BE, 8, 4, "Format", 0},        // 2; should be text "WAVE" = 57 41 56 45
+	{BE, 12, 4, "Subchunk1ID", 0},  // 3; should be text "fmt" = 66 6D 74 20
+	{LE, 16, 4, "Subchunk1Size", 0},// 4; 16 if PCM is used
+	{LE, 20, 2, "AudioFormat", 0},  // 5; 1 ~ PCM, otherwise, there is some kind of compression in data chunk
+	{LE, 22, 2, "NumChannels", 0},  // 6; 1 ~ mono, 2 ~ stereo
+	{LE, 24, 4, "SampleRate", 0},   // 7;
+	{LE, 28, 4, "ByteRate", 0},     // 8;
+	{LE, 32, 2, "BlockAlign", 0},   // 9; # of bytes for one sample
+	{LE, 34, 2, "BitsPerSample", 0},// 10;
+	{BE, 36, 4, "Subchunk2ID", 0},  // 11; should be text "data"
+	{LE, 40, 4, "Subchunk2Size", 0} // 12; # of bytes in the rest of the file
+};
+
+
+/*
+ *  Returns converted input int array in specified endian format
+ *   into simple integer value.
+ */
+unsigned long toInt(char *data, int size, ENDIAN endian) {
+	unsigned long ret = 0;
 	int i;
 	for (i=0; i<size; i++) {
 		// big endian
 		if (endian == 1) {
-		  ret |= data[i] & 0x00FF;
+		  ret |= (unsigned char) data[i] & 0xFF;
 			if (i != size-1) {
 				ret <<= 8;
 			}
 		}
 		// little endian
 	 	else {
-			ret |= ((data[i] & 0x00FF) << (i*8));
+			ret |= ((unsigned char)(data[i] & 0xFF) << (i*8));
 		}
 	}
 
 	return ret;
 }
 
-int elementToInt(struct element *h, int pos) {
-	int b = (toInt(h[0].data, h[0].size, h[0].endian) == 0x52494658) ? 1 : h[pos].endian;
-	return toInt(h[pos].data, h[pos].size, b);
+/*
+ *  Returns 1 if default endian is marked as Big, 0 otherwise.
+ */
+ENDIAN getEndian(struct element *h) {
+	return (toInt(h[0].data, h[0].size, h[0].endian) == RIFX) ? BE : LE;
 }
 
 /*
- *	Conversion between array of short integers and double.
- *	Double is made by normalization into [-1; 1] interval.
- *
- *	short int *data  - input array with data to convert
- *	int size         - length of array *data
- *	short int endian - 1~big endian, 0~little endian
+ *  For given position and header, propriately calls toInt function.
  */
-double toDouble(char *data, int size, short endian) {
-	int ret = 0;
-	int i;
-	for (i=0; i<size; i++) {
-		// big endian
-		if (endian == 1) {
-		  ret |= (unsigned char) data[i];
-			if (i != size-1) {
-				ret <<= 8;
-			}
-		}
-		// little endian
-	 	else {
-			ret |= ((unsigned char) data[i]) << (i*8);
-		}
+unsigned long elementToInt(struct element *h, int pos) {
+	int endian = 0x01 & (getEndian(h) | h[pos].endian);
+	return toInt(h[pos].data, h[pos].size, endian);
+}
+
+/*
+ *  Conversion between array of short integers and double.
+ *  Double is made by normalization into [-1; 1] interval.
+ *
+ *  short int *data  - input array with data to convert
+ *  int size         - length of array *data
+ */
+double toDouble(char *data, int size) {
+	double ret = 0;
+	if (size == 1) {
+		ret = (double) ((unsigned char *) data)[0];
+		ret = ret/255 - 0.5;
+	} else if (size == 2) {
+		ret = (double) ((char)data[0] + (char)data[1]*255);
+		ret /= 65535;
+	} else {
+		fprintf(stderr, "Unsupported byte length\n");
 	}
 
-	return ret/pow(2, size*8 - 1) - 1.0;
+	return ret;
 }
 
 /*
- *	Returns number of channels as it is in given header
+ *  Returns number of channels as it is in given header.
  */
-int getNumChannels(struct element *h) {
+unsigned int getNumChannels(struct element *h) {
 	return elementToInt(h, 6);
 }
 
 /*
- *	Returns rate of samples in Hz as it is in given header
+ *  Returns rate of samples in Hz as it is in given header.
  */
-int getSampleRate(struct element *h) {
+unsigned long getSampleRate(struct element *h) {
 	return elementToInt(h, 7);
 }
 
 /*
- *	Returns number of bytes in the data block
+ *  Returns number of bytes in the data block.
  */
-int getSubchunk2Size(struct element *h) {
+unsigned long getSubchunk2Size(struct element *h) {
 	return elementToInt(h, 12);
 }
 
 /*
- *	Compares data in element.data with given integer value
- *	 and returns 0 if values are equal, 1 otherwise.
+ *  Compares data in element.data with given integer value
+ *   and returns 0 if values are equal, 1 otherwise.
  */
 int elementComp(struct element *h, int pos, unsigned int val) {
 	if (elementToInt(h, pos) == val) {
@@ -120,37 +133,36 @@ int elementComp(struct element *h, int pos, unsigned int val) {
 }
 
 /*
- *	Retrieve data from WAV file and save them in element structure header
+ *  Retrieve data from WAV file and save them in local element
+ *   structure "header".
  */
 int initHeader(int fd) {
-	char *buf;
 	int i;
 	for (i=0; i<HEADER_SIZE; i++) {
 		int size = header[i].size;
- 		if ((buf = (char *) calloc((size+1), sizeof(char))) == NULL) {
+ 		if ((header[i].data = (char *) calloc((size+1), sizeof(char))) == NULL) {
 			perror("calloc");
 			return -1;
 		}
 
 		// move to specific offset where data should be stored
 		lseek(fd, header[i].offset, SEEK_SET);
-		if (read(fd, buf, size) != size) {
+		if (read(fd, header[i].data, size) != size) {
 			fprintf(stderr, "Header was set incorrectly.");
 			exit (2);
 		}
 		
-		header[i].data = buf;
-		printf("%s = ", header[i].name);
+		log_out(45, "%s = ", header[i].name);
 		// use big endian
-		if (header[i].endian == 1) {
-			printf("%s\n", header[i].data);
+		if (header[i].endian == BE) {
+			log_out(45, "%s\n", header[i].data);
 		} else {
-			printf("%d\n", elementToInt(header, i));
+			log_out(45, "%lu\n", elementToInt(header, i));
 		}
 	}
 
 	// simple check, if file has WAVE header
-	if (elementComp(header, 2, 0x57415645) != 0) {
+	if (elementComp(header, 2, WAVE) != 0) {
 		fprintf(stderr, "Not a WAV file header\n");
 		return -1;
 	}
@@ -163,6 +175,10 @@ int initHeader(int fd) {
 	return 0;
 }
 
+/*
+ *  Release memory allocated by ELEMENT structure and set
+ *   its pointers to NULL.
+ */
 void freeHeader(struct element *h) {
 	int i;
 	for (i=0; i<HEADER_SIZE; i++) {
@@ -171,6 +187,10 @@ void freeHeader(struct element *h) {
 	}
 }
 
+/*
+ *  Returns "ch_id"-th sound channel from WAV file with file
+ *   descriptor "fd".
+ */
 C_ARRAY *getChannel(int fd, short ch_id) {
 	// array for input samples
 	C_ARRAY *ca;
@@ -181,7 +201,6 @@ C_ARRAY *getChannel(int fd, short ch_id) {
 	int bps = elementToInt(header, 10);
 	// # of bytes per sample
 	int B_SIZE = bps/8;
-	char *buf = (char *) calloc(B_SIZE, sizeof(char));
 	// jump to offset where the data starts
 	lseek(fd, 44+B_SIZE*ch_id, SEEK_SET);
 	// # of channels
@@ -189,6 +208,11 @@ C_ARRAY *getChannel(int fd, short ch_id) {
 	// # of total samples
 	int tns = elementToInt(header, 12);
 
+	char *buf;
+	if ((buf = (char *) calloc(B_SIZE, sizeof(char))) == NULL) {
+		perror("calloc");
+		return NULL;
+	}
 	while (read(fd, buf, B_SIZE) > 0 && r < tns) {
 		// we need more memory for next samples/values
 		if (ca->max - ca->len == 0) {
@@ -196,10 +220,16 @@ C_ARRAY *getChannel(int fd, short ch_id) {
 		}
 		r++;
 
-		//TODO: endianita podle RIF(F|X)?
-		ca->c[ca->len++].re = toDouble(buf, B_SIZE, 0);
-		if (r<=15) {
-			printf("%d-th sample: %.5f\n", r, ca->c[ca->len-1].re);
+		int i;
+		for (i=0; i<B_SIZE; i++) {
+			printf("data[%d]=0x%x=%u\n", i, (unsigned char) buf[i], (unsigned char)buf[i]);
+		}
+
+		ca->c[ca->len++].re = toDouble(buf, B_SIZE);
+		printf("toDouble = %.2f\n", ca->c[ca->len-1].re);
+
+		if (r <= 11) {
+			log_out(36, "%d-th sample: %.5f\n", r, ca->c[ca->len-1].re);
 		}
 		lseek(fd, B_SIZE*(nch-1), SEEK_CUR);
 	}
@@ -209,6 +239,12 @@ C_ARRAY *getChannel(int fd, short ch_id) {
 	return ca;
 }
 
+/*
+ *  Takes pointers to file, where it tries to read first header
+ *   then if successful, it allocates space in given C_ARRS for
+ *   all channels in this WAV file and stores them separately as
+ *   one sound track.
+ */
 struct element *readWav(C_ARRS *cas, char *fpath) {
 	int fd;
 
@@ -231,14 +267,19 @@ struct element *readWav(C_ARRS *cas, char *fpath) {
 
 	int i;
 	for (i=0; i<nch; i++) {
-		printf("Channel %d:\n", i+1);
+		log_out(36, "Channel %d:\n", i+1);
 		cas->carrs[cas->len++] = getChannel(fd, i);
+		//normalize(cas->carrs[cas->len-1]);
 	}
 
 	close(fd);
 	return header;
 }
 
+/*
+ *  Takes pointer to element structure header, and writes its values
+ *   into given file.
+ */
 void writeHeader(int fd, struct element *h) {
 	// header starts on the first bit of the file
 	lseek(fd, 0, SEEK_SET);
@@ -252,19 +293,31 @@ void writeHeader(int fd, struct element *h) {
 	}
 }
 
+/*
+ *  Take double "d" from range [-1; 1] and convert it to "size" bytes,
+ *   i.e. range [0, 2^(size*8) - 1].
+ *  It's doing invers operation to the function toDouble.
+ */
 void denormalize(char *buf, double d, int size, int endian) {
-	long long int pom = 1; // stores denormalized integer value
-	long long int mask = 0xff; // mask for lowest one byte
-	d += 1.0;	// return d from range [-1; 1] to non-negative value
-	pom <<= size*8 - 1;
-	pom *= d;
+	/* Stores denormalized value of input double, 2 bytes are enough */
+	short pom = 0;
+	/* Denormalize to get integer value out of double */
+	if (size == 1) {
+		pom = (d + 0.5)*255; 
+	} else if (size == 2) {
+		pom = d*65535;
+	}
+
 	int i;
 	for (i=0; i<size; i++) {
-		// little endian format
-		buf[i] = (pom >> i*8) & mask;
+		buf[i] = (char) ((pom >> i*8) & 0xff);
 	}
 }
 
+/*
+ *  Writes "ch_id"-th sound channel "ca" into data section of a file
+ *   that has WAV header already prepared.
+ */
 int writeChannel(struct element *h, C_ARRAY *ca, int fd, int ch_id) {
 	int nch = elementToInt(h, 6);
 	int bps = elementToInt(h, 10);
@@ -284,10 +337,11 @@ int writeChannel(struct element *h, C_ARRAY *ca, int fd, int ch_id) {
 		return -1;
 	}
 
-	// jump to the start of the data section
+	/* Jump to the start of the data section */
 	lseek(fd, 44+B_SIZE*ch_id, SEEK_SET);
+	/* Start writing sound data */
 	int i;
-	for (i=0; i<ctw; i++) {
+	for (i=0; i<ctw && i<ca->len; i++) {
 		denormalize(buf, ca->c[i].re, B_SIZE, 0);
 		if (write(fd, buf, B_SIZE) <= 0) {
 			perror("write");
@@ -295,6 +349,7 @@ int writeChannel(struct element *h, C_ARRAY *ca, int fd, int ch_id) {
 		}
 		lseek(fd, B_SIZE*(nch-1), SEEK_CUR);
 	}
+	// TODO: zapsani nul na zarovnani dat do konce souboru
 
 	free(buf);
 
@@ -302,8 +357,8 @@ int writeChannel(struct element *h, C_ARRAY *ca, int fd, int ch_id) {
 }
 
 /*
- *	Writes array *cas into file using WAV format.
- *	Struct element *h must be already prepared.
+ *  Writes array *cas into file using WAV format.
+ *  Struct element *h must be already prepared.
  */
 void writeWav(struct element *h, C_ARRS *cas, char *fpath) {
 	int fd;
@@ -319,6 +374,8 @@ void writeWav(struct element *h, C_ARRS *cas, char *fpath) {
 		return;
 	}
 
+	// Only LE is supported
+	strcpy(h[0].data, "RIFF");
 	writeHeader(fd, h);
 
 	int i;

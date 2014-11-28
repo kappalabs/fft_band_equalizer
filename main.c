@@ -446,7 +446,8 @@ int main(int argc, char **argv) {
 		printf("INPUT %d, #samples: %d length->^2: %d:\n", i+1, ilen, ilen2);
 		gnuplot_cmd(g, "set output \"input_%d.png\"", i+1);
 		for (j=0; j<ilen; j++) {
-			x[j] = j; y[j] = ins->carrs[i]->c[j].re;
+			x[j] = j;
+			y[j] = ins->carrs[i]->c[j].re;
 		}
 		gnuplot_plot_xy(g, x, y, ilen, "Input");
 		gnuplot_close(g);
@@ -469,57 +470,19 @@ int main(int argc, char **argv) {
 			win->len = MIN(WLEN, ilen - w_i*WLEN);
 			printf("win->len = %d\n", win->len);
 
-		g = gnuplot_init();
-		gnuplot_cmd(g, "set terminal png");
-		gnuplot_cmd(g, "set output \"windowing_%d.png\"", w_i+1);
-		gnuplot_setstyle(g, "lines");
-		for (j=0; j < win->len; j++) {
-			x[j] = j;
-			y[j] = win->c[j].re;
-		}
-		gnuplot_plot_xy(g, x, y, win->len, "Before func");
-		gnuplot_close(g);
-
 			//hammingWindow(win, 0.53836, 0.46164);
-			planckWindow(win, 0.1);
-			//tukeyWindow(win, 0.0001);
-
-		g = gnuplot_init();
-		gnuplot_cmd(g, "set terminal png");
-		gnuplot_cmd(g, "set output \"windowing_%d_.png\"", w_i+1);
-		gnuplot_setstyle(g, "lines");
-		for (j=0; j < win->len; j++) {
-			x[j] = j;
-			y[j] = win->c[j].re;
-		}
-		gnuplot_plot_xy(g, x, y, win->len, "Window func");
-		gnuplot_close(g);
+			//planckWindow(win, 0.1);
+			//tukeyWindow(win, 0.1);
 
 			re = fft(win);
 			processModifs(modifs_head, re, oct, getSampleRate(header));
 			ire = ifft(re);
 			copyCA(ire, 0, wav_out, w_i*WLEN, MIN(WLEN, ilen - w_i*WLEN));
-			//TODO: EXPERIMENTAL Smoothing
-//			int gap = w_i*WLEN;
-//			wav_out->c[0] = wav_out->c[1];
-//			wav_out->c[wav_out->len-1] = wav_out->c[wav_out->len-2];
-//			wav_out->c[gap].re = (wav_out->c[MAX(gap-2, 0)].re + wav_out->c[gap+1].re)/2.0;
 
 			printf("copy do wav_out od %d, %d prvku\n", w_i*WLEN, WLEN);
 			freeCA(ire); freeCA(re);
 		}
 
-		// Write result to WAV file
-		if (o_flag == 1) {
-			C_ARRS *caso;
-			caso = allocCAS(1);
-			caso->carrs[caso->len++] = wav_out;
-			writeWav(header, caso, out_file);
-			printf("caso-wav_out: len=%d, max=%d\n", wav_out->len, wav_out->max);
-
-			free(caso->carrs);
-			free(caso);
-		}
 		g = gnuplot_init();
 		gnuplot_cmd(g, "set terminal png");
 		gnuplot_setstyle(g, "lines");
@@ -532,72 +495,17 @@ int main(int argc, char **argv) {
 		gnuplot_plot_xy(g, x, y, wav_out->len, "Invers");
 		gnuplot_close(g);
 
+		// Write result to WAV file
+		if (o_flag == 1) {
+			C_ARRS *caso;
+			caso = allocCAS(1);
+			caso->carrs[caso->len++] = wav_out;
+			writeWav(header, caso, out_file);
+			printf("caso-wav_out: len=%d, max=%d\n", wav_out->len, wav_out->max);
 
-//		/*
-//		 *	COUNTS FOURIER TRANSFORM AND APPLIES EQUALIZATION
-//		 */
-//		g = gnuplot_init();
-//		gnuplot_cmd(g, "set terminal png");
-//		printf("OUTPUT FOURIER %d:\n", i+1);
-//		gnuplot_cmd(g, "set output \"fourier_%d.png\"", i+1);
-//		gnuplot_setstyle(g, "lines");
-//		initDoubles(x, imax);
-//		initDoubles(y, imax);
-//		re = fft(ins->carrs[i]);
-////TODO: EXPERIMENTAL
-//		int pom = re->max;
-//		re->max = ilen2;
-//		processModifs(modifs_head, re, oct, getSampleRate(header));
-//		re->max = pom;
-//
-//		for (j=0; j < ilen2; j++) {
-//			x[j] = j;
-//			y[j] = decibel(re->c[j]);
-//		}
-//		gnuplot_set_ylabel(g, "dBFS");
-//		gnuplot_plot_xy(g, x, y, ilen2/2, "Fourier");
-//		gnuplot_close(g);
-//
-//		sprintf(fname, "fourier_%d.mat", i+1);
-//		writeOutput(fname, re);
-//
-//		/*
-//		 *	COUNTS INVERS FOURIER TRANSFORM
-//		 */
-//		g = gnuplot_init();
-//		gnuplot_cmd(g, "set terminal png");
-//		gnuplot_setstyle(g, "lines");
-//		printf("OUTPUT INVERS FOURIER %d:\n", i+1);
-//		gnuplot_cmd(g, "set output \"invers_%d.png\"", i+1);
-//		initDoubles(x, imax);
-//		initDoubles(y, imax);
-//		ire = ifft(re);
-//		for (j=0; j < ilen; j++) {
-//			x[j] = j; y[j] = ire->c[j].re;
-//		}
-//		char *dc = allocString(32);
-//		char *nq = allocString(32);
-//		formatComplex(ire->c[0], dc);
-//		formatComplex(ire->c[ilen2/2], nq);
-//		printf("DC slot = %s, Nyquist slot = %s\n", dc, nq);
-//		free(dc); free(nq);
-//		gnuplot_plot_xy(g, x, y, ilen, "Invers");
-//		gnuplot_close(g);
-//
-////TODO: EXPERIMENTAL: zapis vystupu do WAV souboru
-//		if (o_flag == 1) {
-//			C_ARRS *caso;
-//			caso = allocCAS(1);
-//			caso->carrs[caso->len++] = ire;
-//			writeWav(header, caso, out_file);
-//
-//			free(caso->carrs);
-//			free(caso);
-//		}
-//
-//		sprintf(fname, "invers_%d.mat", i+1);
-//		writeOutput(fname, ire);
-
+			free(caso->carrs);
+			free(caso);
+		}
 		printf("\n\n");
 
 		free(fname);
