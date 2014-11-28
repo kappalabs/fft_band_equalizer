@@ -28,17 +28,17 @@ char const * program_name;
 
 static void usage(void) {
 	fprintf(stderr, "Usage: %s -f in_file [-w] [-r denom] [-k list] [-d level]\n"
-									"   -f in_file: set the name of an input file to \"in_file\"\n\n"
-									"   -w:         input file is in WAV format\n\n"
-									"   -r denom:   set Octave bands control to [1/denom] (must be in range [1; 24] by standard ISO)\n"
-									"        (default value is 1)\n\n"
-									"   -k list:    list defines configuration of virtual knobs separated by commas, every knob has 3 properties:\n"
-									"        band ID:  integer representing specific band, interval depends on choosen Octave fraction (-r option)\n"
-									"        function: must be one of \"f\" for flat, \"p\" for peak, or \"n\" for next\n"
-									"        gain:     integer value from range [-24; 24] (in dB) with, or without its sign\n"
-									"        EXAMPLE:  -k 1f+20,7n-24,42p+21 (use flat function applied to the first band with gain 20dB, etc.)\n\n"
-									"   -d level:   changes debug level to \"level\", smaller value means more info\n"
-									"        (default value is 90, used range is [1; 100])\n", program_name);
+		"   -f in_file: set the name of an input file to \"in_file\"\n\n"
+		"   -w:         input file is in WAV format\n\n"
+		"   -r denom:   set Octave bands control to [1/denom] (must be in range [1; 24] by standard ISO)\n"
+		"        (default value is 1)\n\n"
+		"   -k list:    list defines configuration of virtual knobs separated by commas, every knob has 3 properties:\n"
+		"        band ID:  integer representing specific band, interval depends on choosen Octave fraction (-r option)\n"
+		"        function: must be one of \"f\" for flat, \"p\" for peak, or \"n\" for next\n"
+		"        gain:     integer value from range [-24; 24] (in dB) with, or without its sign\n"
+		"        EXAMPLE:  -k 1f+20,7n-24,42p+21 (use flat function applied to the first band with gain 20dB, etc.)\n\n"
+		"   -d level:   changes debug level to \"level\", smaller value means more info\n"
+		"        (default value is 90, used range is [1; 100])\n", program_name);
 	exit (ERROR_EXIT_CODE);
 }
 
