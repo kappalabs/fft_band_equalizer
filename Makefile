@@ -32,7 +32,7 @@ debug:	clean $(PROG)
 
 run:	clean $(PROG)
 #	./main -d 80 -f sample.in >main.log
-	./main -d 40 -f $(INFILE) -w -o "output.wav" -k 5p+1,9p-2 >$(PROG).log
+	./main -d 40 -f $(INFILE) -w -o "output.wav" -k 2p+10,5p-10,6f-20 >$(PROG).log
 	mplayer $(INFILE) 1>/dev/null
 	mplayer "output.wav" 1>/dev/null
 

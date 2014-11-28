@@ -137,6 +137,7 @@ int elementComp(struct element *h, int pos, unsigned int val) {
  *   structure "header".
  */
 int initHeader(int fd) {
+	log_out(45, "WAV header data:\n");
 	int i;
 	for (i=0; i<HEADER_SIZE; i++) {
 		int size = header[i].size;
@@ -160,6 +161,7 @@ int initHeader(int fd) {
 			log_out(45, "%lu\n", elementToInt(header, i));
 		}
 	}
+	log_out(45, "\n");
 
 	// simple check, if file has WAVE header
 	if (elementComp(header, 2, WAVE) != 0) {
@@ -220,13 +222,7 @@ C_ARRAY *getChannel(int fd, short ch_id) {
 		}
 		r++;
 
-		int i;
-		for (i=0; i<B_SIZE; i++) {
-			printf("data[%d]=0x%x=%u\n", i, (unsigned char) buf[i], (unsigned char)buf[i]);
-		}
-
 		ca->c[ca->len++].re = toDouble(buf, B_SIZE);
-		printf("toDouble = %.2f\n", ca->c[ca->len-1].re);
 
 		if (r <= 11) {
 			log_out(36, "%d-th sample: %.5f\n", r, ca->c[ca->len-1].re);

@@ -13,4 +13,6 @@ extern void log_out(int level, const char* text_form, ...);
 extern int is_pow_of_2(int val);
 extern int get_pow(int val, int base);
 
+extern double *allocDoubles(unsigned int len);
+
 #endif

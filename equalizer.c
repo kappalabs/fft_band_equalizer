@@ -133,13 +133,15 @@ struct octave *initOctave(int base, int frac) {
 	addBand(oct, base);
 	recNext(oct, base);
 
-//TODO: EXPERIMENTAL: vypis spoctenych pasem teto Octave
 	log_out(65, "Octave [1/%d] length is %d\n", oct->frac, oct->len);
 	struct band *b = oct->head;
+	int i=1;
+	log_out(61, "Bands:\n");
 	while (b != NULL) {
-		log_out(61, "%.2f (%.2f; %.2f)\n", b->center, b->lowerE, b->upperE);
+		log_out(61, "%d. %.2f (%.2f; %.2f)\n", i++, b->center, b->lowerE, b->upperE);
 		b = b->next;
 	}
+	log_out(61, "\n");
 
 	return oct;
 }
@@ -390,23 +392,6 @@ void tukeyWindow(C_ARRAY *ca, double alpha) {
 			ca->c[i].re *= tukey(i, alpha, 1.0, ca->len/1); 
 		} else if (i > (ca->len-1)*(1-alpha/2)) {
 			ca->c[i].re *= tukey(i, alpha, 0, ca->len/1); 
-		}
-	}
-}
-
-/*
- *  Smooth discrete points on the edge of window function.
- */
-void smooth(C_ARRAY *ca, int st, int tg) {
-		COMPLEX av;
-		av.im = ca->c[st-1].im + ca->c[tg+1].im;
-		av.im /= 2.0;
-		av.re = ca->c[st-1].re + ca->c[tg+1].re;
-		av.re /= 2.0;
-	if (st > 0 && st <= ca->len) {
-		int i;
-		for (i=st; i<tg; i++) {
-			ca->c[i] = av;
 		}
 	}
 }

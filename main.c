@@ -25,24 +25,6 @@
 char const * program_name;
 
 
-static void initDoubles(double *ds, unsigned int len) {
-	int i;
-	for (i=0; i<len; i++) {
-		ds[i] = 0.0f;
-	}
-}
-
-static double *allocDoubles(unsigned int len) {
-	double *d;
-	if ((d = (double *) malloc(len * sizeof(double))) == NULL) {
-		perror("malloc");
-		exit (ERROR_EXIT_CODE);
-	}
-
-	initDoubles(d, len);
-
-	return d;
-}
 
 static void usage(void) {
 	fprintf(stderr, "Usage: %s -f in_file [-w] [-r denom] [-k list] [-d level]\n"
@@ -234,7 +216,6 @@ struct b_modif *addModif(struct b_modif *head, struct octave *oct, char func, in
  *	Assume the input is in correct format.
  */
 struct b_modif *initModifs(struct b_modif *head, struct octave *oct, char *bands_in) {
-//TODO: priklad formatu vstupu: 1f+24,5n-18,6p20,9n-18
 	int i=0;
 	char akt;
 	char *token = allocString(20);
@@ -287,10 +268,11 @@ void processModifs(struct b_modif *head, C_ARRAY *ca, struct octave *oct, int sr
 	// go throught all of them and make the modification
 	while (actb != NULL) {
 		struct band *bnd = getBand(oct, actb->band_id);
-		printf("Processing modification of %d. band with gain %.2f\n", actb->band_id, actb->gain);
+		log_out(71, "Processing modification of %d. band with gain %.2f\n", actb->band_id, actb->gain);
 		actb->modif_f(ca, bnd, srate, actb->gain);
 		actb = actb->next;
 	}
+	log_out(71, "\n");
 }
 
 /*
@@ -440,11 +422,14 @@ int main(int argc, char **argv) {
 		double *x = allocDoubles(imax);
 		double *y = allocDoubles(imax);
 
+		printf("INPUT %d, #samples: %d length->^2: %d:\n", i+1, ilen, ilen2);
+
 		g = gnuplot_init();
 		gnuplot_cmd(g, "set terminal png");
 		gnuplot_setstyle(g, "lines");
-		printf("INPUT %d, #samples: %d length->^2: %d:\n", i+1, ilen, ilen2);
 		gnuplot_cmd(g, "set output \"input_%d.png\"", i+1);
+		memset(x, 0, imax*sizeof(double));
+		memset(y, 0, imax*sizeof(double));
 		for (j=0; j<ilen; j++) {
 			x[j] = j;
 			y[j] = ins->carrs[i]->c[j].re;
@@ -462,24 +447,42 @@ int main(int argc, char **argv) {
 		 */
 		wav_out = allocCA(ilen);
 		int win_num = (int) ceil(ilen/WLEN);
-		printf("win_num = %d\n", win_num);
+		log_out(45, "Total number of windows is %d\n", win_num);
+		log_out(71, "\n");
 		int w_i;
 		for (w_i=0; w_i < win_num; w_i++) {
+			log_out(55, "Processing %d. window:\n", w_i+1);
 			copyCA(ins->carrs[i], w_i*WLEN, win, 0, WLEN);
 			win->max = WLEN;
 			win->len = MIN(WLEN, ilen - w_i*WLEN);
-			printf("win->len = %d\n", win->len);
 
+			/* Not actually used, window functions needs to handle overlapping */
 			//hammingWindow(win, 0.53836, 0.46164);
 			//planckWindow(win, 0.1);
 			//tukeyWindow(win, 0.1);
 
+			/* Transform sound to frequency domain */
 			re = fft(win);
+
+		g = gnuplot_init();
+		gnuplot_cmd(g, "set terminal png");
+		gnuplot_setstyle(g, "lines");
+		gnuplot_cmd(g, "set output \"fft_window_%d.png\"", w_i+1);
+		memset(x, 0, imax*sizeof(double));
+		memset(y, 0, imax*sizeof(double));
+		for (j=0; j < re->len; j++) {
+			x[j] = j;
+			y[j] = decibel(re->c[j]); 
+		}
+		gnuplot_plot_xy(g, x, y, re->len/2, "FT");
+		gnuplot_close(g);
+
+			/* Apply modifications */
 			processModifs(modifs_head, re, oct, getSampleRate(header));
+			/* Transform back to time domain */
 			ire = ifft(re);
 			copyCA(ire, 0, wav_out, w_i*WLEN, MIN(WLEN, ilen - w_i*WLEN));
 
-			printf("copy do wav_out od %d, %d prvku\n", w_i*WLEN, WLEN);
 			freeCA(ire); freeCA(re);
 		}
 
@@ -487,8 +490,8 @@ int main(int argc, char **argv) {
 		gnuplot_cmd(g, "set terminal png");
 		gnuplot_setstyle(g, "lines");
 		gnuplot_cmd(g, "set output \"wav_out.png\"");
-		initDoubles(x, imax);
-		initDoubles(y, imax);
+		memset(x, 0, imax*sizeof(double));
+		memset(y, 0, imax*sizeof(double));
 		for (j=0; j < wav_out->len; j++) {
 			x[j] = j; y[j] = wav_out->c[j].re;
 		}
@@ -497,11 +500,11 @@ int main(int argc, char **argv) {
 
 		// Write result to WAV file
 		if (o_flag == 1) {
+			log_out(55, "Writing result to WAV file\n");
 			C_ARRS *caso;
 			caso = allocCAS(1);
 			caso->carrs[caso->len++] = wav_out;
 			writeWav(header, caso, out_file);
-			printf("caso-wav_out: len=%d, max=%d\n", wav_out->len, wav_out->max);
 
 			free(caso->carrs);
 			free(caso);

@@ -47,3 +47,13 @@ int get_pow(int val, int base) {
 
 	return nearest;
 }
+
+double *allocDoubles(unsigned int len) {
+	double *d;
+	if ((d = (double *) calloc(len, sizeof(double))) == NULL) {
+		perror("malloc");
+		exit (ERROR_EXIT_CODE);
+	}
+
+	return d;
+}
