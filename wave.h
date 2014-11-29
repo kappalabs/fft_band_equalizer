@@ -51,11 +51,11 @@ typedef enum {
  *  This structure represents one line.
  */
 typedef struct {
-	ENDIAN endian; // 1 - big endian, 0 - little endian
-	int offset;    // in number of bytes
-	short size;    // in number of bytes
-	char *name;    // few characters specifying element name
-	char *data;    // stores the data of this element itself
+	ENDIAN endian; /* BE=1 ~ big endian, xor 0=LE ~ little endian */
+	int offset;    /* In number of bytes */
+	short size;    /* In number of bytes */
+	char *name;    /* Few characters specifying element name */
+	char *data;    /* Stores the data of this element itself */
 } ELEMENT;
 
 
