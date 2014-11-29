@@ -1,3 +1,35 @@
+/*
+ * Copyright (c) 2014, Vojtech Vasek
+ *
+
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.*
+ *  
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+/*
+ * ==============================================================================
+ *
+ *       Filename:  string.c
+ *
+ *    Description:  This module contains functions to simplify work with strings.
+ *                  It defines new structure STRING containing some useful
+ *                  information which string usually has.
+ *
+ *         Author:  Vojtech Vasek
+ *
+ * ==============================================================================
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -7,82 +39,22 @@
 
 
 /*
- *	FUNCTIONS FOR WORK WITH STRUCTURE STRING
+ *  FUNCTIONS FOR WORK WITH SIMPLE STRING REPRESENTATION
  */
 
-void initStr(STRING *s, unsigned int length, unsigned int start) {
-	s->len = start;
-	s->max = length-1;
-
-	int i;
-	for (i=start; i<length; i++) {
-		s->text[i] = '\0';
-	}
-}
-
-STRING *allocStr(unsigned int length) {
-	STRING *s;
-
-	if ((s = (STRING *) malloc(sizeof(STRING))) == NULL) {
-		perror("malloc");
-		return NULL;
-	}
-
-	if ((s->text = (char *) calloc(length, sizeof(char))) == NULL) {
-		perror("calloc");
-		return NULL;
-	}
-
-	initStr(s, length, 0);
-
-	return s;
-}
-
-void reallocStr(STRING *s, unsigned int nlen) {
-	int olen = s->max+1;
-
-	if ((s->text = (char *) realloc(s->text, nlen * sizeof(char))) == NULL) {
-		perror("malloc");
-	}
-
-	initStr(s, nlen, olen);
-}
-
-void freeStr(STRING *s) {
-	free(s->text);
-	s->text = NULL;
-	free(s);
-	s = NULL;
+/*
+ *  Initialize allocated array of characters to zero bytes.
+ */
+void init_chars(char *chars, unsigned int length) {
+	memset(chars, '\0', length);
 }
 
 /*
- *	FUNCTIONS FOR BASIC STRING OPERATIONS
+ *  Allocate array of exactly "length" number of characters and
+ *   return pointer to it if allocation was succesfull, NULL
+ *   otherwise.
  */
-/*
- *	Appends one char to the end of given string,
- *	 which must have space for it.
- */
-void append(char *str, char c) {
-	int len = strlen(str);
-	str[len] = c;
-	str[len+1] = '\0';
-}
-
-/*
- *	FUNCTIONS FOR WORK WITH SIMPLE STRING REPRESENTATION
- */
-/*
- *	Initialize allocated string to zero bytes
- */
-void initString(char *str, unsigned int length) {
-	int i;
-	for (i=0; i<length; i++) {
-		str[i] = '\0';
-	}
-	str[length-1] = '\0';
-}
-
-char *allocString(unsigned int length) {
+char *alloc_chars(unsigned int length) {
 	char *s;
 
 	if ((s = (char *) calloc(length, sizeof(char))) == NULL) {
@@ -91,4 +63,80 @@ char *allocString(unsigned int length) {
 	}
 
 	return s;
+}
+
+
+/*
+ *  FUNCTIONS FOR WORK WITH STRUCTURE STRING REPRESENTATION
+ */
+
+/*
+ *  Initialize given STRING with zero byte from position "start" to
+ *  byte on position "length".
+ *  Also set length and maximum appropriately.
+ */
+void init_string(STRING *s, unsigned int length, unsigned int start) {
+	s->len = start;
+	s->max = length;
+
+	/* Null out including the last "unvisible" byte */
+	memset(s->text, '\0', s->max+1);
+}
+
+/*
+ *  Allocate and initialize new STRING structure of the given length.
+ *  Return prepared STRING if allocation was succesfull.
+ */
+STRING alloc_string(unsigned int length) {
+	STRING s;
+
+	/* Allocate length bytes + 1 for last null byte */
+	if ((s.text = (char *) malloc(length+1)) == NULL) {
+		perror("malloc");
+	} else {
+		init_string(&s, length, 0);
+	}
+
+	return s;
+}
+
+/*
+ *  Reallocate given STRING to the new given length.
+ *  Also initialize new bytes to zero.
+ */
+void realloc_string(STRING *s, unsigned int new_len) {
+	int olen = s->max;
+
+	if ((s->text = (char *) realloc(s->text, new_len + 1)) == NULL) {
+		perror("realloc");
+	} else {
+		init_string(s, new_len, olen);
+	}
+}
+
+/*
+ *  Release allocated memory for given STRING structure and set pointers to NULL.
+ */
+void free_string(STRING *s) {
+	free(s->text);
+	s->text = NULL;
+}
+
+
+/*
+ *  FUNCTIONS FOR USEFUL STRING OPERATIONS
+ */
+
+/*
+ *  Appends one char to the end of given string,
+ *   allocate more memory if needed.
+ */
+void append(STRING *str, char c) {
+	/* Check if we need to allocate more memory */
+	if (str->max - str->len < 1) {
+		realloc_string(str, str->max+1);
+	}
+
+	str->text[str->len] = c;
+	str->text[++str->len] = '\0';
 }

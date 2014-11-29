@@ -1,3 +1,41 @@
+/*
+ * Copyright (c) 2014, Vojtech Vasek
+ *
+
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.*
+ *  
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+/*
+ * ==============================================================================
+ *
+ *       Filename:  equalizer.c
+ *
+ *    Description:  This module contains functions for work with Octave, bands,
+ *                  sound modification and the Fourier transform itself.
+ *                  Octave and its bands are counted here from given
+ *                  base frequency and fraction denominator.
+ *                  Three window functions are Hamming(hammingWindow),
+ *                  Planck(planckWindow) and Tukey(tukeyWindow). Sound
+ *                  modification functions are called Flat(flatBand),
+ *                  Peak(peakBand) and Next(nextBand).
+ *                  Fourier transform is implemented recursively.
+ *
+ *         Author:  Vojtech Vasek
+ *
+ * ==============================================================================
+ */
+
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -7,48 +45,48 @@
 #include "complex.h"
 #include "string.h"
 
-// Values are in Hz
+/* Following values are in Hz units */
 #define FQ_HEARABLE_UPPER_BOUND 22000
 #define FQ_HEARABLE_LOWER_BOUND 20
 
 
 /*
- *	For given frequency and desired octave fraction
- *	 returns next frequency center
+ *  For given frequency and desired octave fraction
+ *   returns next frequency center.
  */
-double getNextCenter(double from, int frac) {
-	return from*pow(10.0, 3.0/(10.0*frac));
+static double getNextCenter(double from, int frac) {
+	return from*pow(10, 3.0/(10.0*frac));
 }
 
 /*
- *	For given frequency and desired octave fraction
- *	 returns previous frequency center
+ *  For given frequency and desired octave fraction
+ *   returns previous frequency center.
  */
-double getPrevCenter(double from, int frac) {
-	return from/pow(10.0, 3.0/(10.0*frac));
+static double getPrevCenter(double from, int frac) {
+	return from/pow(10, 3.0/(10.0*frac));
 }
 
 /*
  *  For given center frequency and Octave fraction
  *   counts upper frequency edge and returns its value.
  */
-double upperEdge(double center, int frac) {
-	return center*pow(10.0, (3.0/(10.0*2*frac)));
+static double upperEdge(double center, int frac) {
+	return center*pow(10, (3.0/(10.0*2*frac)));
 }
 
 /*
  *  For given center frequency and Octave fraction
  *   counts lower frequency edge and returns its value.
  */
-double lowerEdge(double center, int frac) {
-	return center/pow(10.0, (3.0/(10.0*2*frac)));
+static double lowerEdge(double center, int frac) {
+	return center/pow(10, (3.0/(10.0*2*frac)));
 }
 
 /*
  *  Allocates new Octave structure and returns pointer
  *   to it. Values of this structure are also initialized.
  */
-struct octave *allocOctave(int frac) {
+static struct octave *allocOctave(int frac) {
 	struct octave *oct;
 	if ((oct = (struct octave *) malloc(sizeof(struct octave))) == NULL) {
 		perror("malloc");
@@ -66,7 +104,7 @@ struct octave *allocOctave(int frac) {
  *   and octave structure "oct" and adds it to the
  *   end of this structure as linked list.
  */
-void addBand(struct octave *oct, double center) {
+static void addBand(struct octave *oct, double center) {
 	struct band *b;
 	if ((b = (struct band *) malloc(sizeof(struct band))) == NULL) {
 		perror("malloc");
@@ -95,7 +133,7 @@ void addBand(struct octave *oct, double center) {
  *   frequency centers bellow "center" from
  *   the lowest to the highest frequency.
  */
-void recPrev(struct octave *oct, double center) {
+static void recPrev(struct octave *oct, double center) {
 	double prev = getPrevCenter(center, oct->frac);
 	if (prev < FQ_HEARABLE_LOWER_BOUND) {
 		return;
@@ -110,7 +148,7 @@ void recPrev(struct octave *oct, double center) {
  *   frequency centers higher then "center" from
  *   the lowest to the highest frequency.
  */
-void recNext(struct octave *oct, double center) {
+static void recNext(struct octave *oct, double center) {
 	double next = getNextCenter(center, oct->frac);
 	if (next > FQ_HEARABLE_UPPER_BOUND) {
 		return;
@@ -121,9 +159,9 @@ void recNext(struct octave *oct, double center) {
 }
 
 /*
- *	Creates structure containing bands specific to the given frac
- *	 base frequency "base" is usually 1000Hz (standard base for
- *	 ISO Octaves)
+ *  Creates structure containing bands specific to the given frac
+ *   base frequency "base" is usually 1000Hz (standard base for
+ *   ISO Octaves)
  */
 struct octave *initOctave(int base, int frac) {
 	struct octave *oct;
@@ -147,28 +185,7 @@ struct octave *initOctave(int base, int frac) {
 }
 
 /*
- *  For given "band_id" returns pointer to apropriate
- *   band from this position in Octave structure,
- *   NULL if position is incorrect.
- *   "band_id" should be from range [1; oct->len-1].
- */
-struct band *getBand(struct octave *oct, int band_id) {
-	if (band_id <= 0 || band_id > oct->len) {
-					return NULL;
-	}
-
-	int i=0;
-	struct band *b;
-	b = oct->head;
-	while (++i < band_id) {
-		b = b->next;
-	}
-
-	return b;
-}
-
-/*
- *	Frees allocated memory for the whole Octave structure.
+ *  Frees allocated memory for the whole Octave structure.
  */
 void freeOctave(struct octave *oct) {
 	struct band *b, *nb;
@@ -185,59 +202,47 @@ void freeOctave(struct octave *oct) {
 }
 
 /*
- *  Sets complex number of specific position and its opposite.
+ *  For given "band_id" returns pointer to apropriate
+ *   band from this position in Octave structure,
+ *   NULL if position is incorrect.
+ *   "band_id" should be from range [1; oct->len-1].
  */
-void setCA(C_ARRAY *ca, int pos, double re, double im) {
-	ca->c[pos].re = re;
-	ca->c[pos].im = im;
+struct band *getBand(struct octave *oct, int band_id) {
+	if (band_id <= 0 || band_id > oct->len) {
+		return NULL;
+	}
 
-//	ca->c[ca->len-pos].re = re;
-//	ca->c[ca->len-pos].im = im;
+	int i=0;
+	struct band *b;
+	b = oct->head;
+	while (++i < band_id) {
+		b = b->next;
+	}
+
+	return b;
 }
 
 /*
- *	Function useful for finding index in CA array containing
- *	 Fourier transform of given frequency.
- *	Returns index, which corresponds to given frequency
- *	 in given sample rate.
+ *  Function useful for finding index in CA array containing
+ *   Fourier transform of given frequency.
+ *  Returns index, which corresponds to given frequency
+ *   in given sample rate.
  */
 int freqToIndex(int freq, int len, int rate) {
 	return ((unsigned int)(freq*len))/(unsigned int)rate;
 }
 
 /*
- *	Adds aditive constant or multiplies by multiplicative constant
- *	 every unit of "ca" starting from index "st" to index "tg" in given
- *	 C_ARRAY structure.
+ *  Adds aditive constant or multiplies by multiplicative constant
+ *   every unit of "ca" starting from index "st" to index "tg" in given
+ *   C_ARRAY structure.
  */
-void modulate(C_ARRAY *ca, int st, int tg, double mult, double adit) {
+static void modulate(C_ARRAY *ca, int st, int tg, double mult, double adit) {
 	int i;
 	for (i=st; i<tg; i++) {
 		setCA(ca, i, ca->c[i].re*mult, ca->c[i].im*mult);
 		setCA(ca, i, ca->c[i].re+adit, ca->c[i].im+adit);
 	}
-}
-
-/*
- *  Returns "average" complex number from given array
- *   and interval in it. Average is computed separately
- *   for both real part and imaginary part of the complex
- *   number.
- */
-COMPLEX average(C_ARRAY *ca, int st, int len) {
-	COMPLEX av;
-	av.re = 0.0;
-	av.im = 0.0;
-
-	int i;
-	for (i=st; i < st+len; i++) {
-		av.re += ca->c[i].re;
-		av.im += ca->c[i].im;
-	}
-	av.re /= len;
-	av.im /= len;
-
-	return av;
 }
 
 /*
@@ -352,7 +357,7 @@ void hammingWindow(C_ARRAY *ca, double alpha, double beta) {
 /*
  *  Function used in computation of Planck window function.
  */
-double planck(int n, double epsilon, int sgn, int N) {
+static double planck(int n, double epsilon, int sgn, int N) {
 	double ret;
 	ret = 2.0*epsilon*(1.0/(1.0 + (sgn*2.0*n)/(N-1)) + 1.0/(1.0 - 2.0*epsilon + (sgn*2.0*n)/(N-1)));
 
@@ -378,7 +383,7 @@ void planckWindow(C_ARRAY *ca, double epsilon) {
 /*
  *  Function used in computation of Tukey window function.
  */
-double tukey(int n, double alpha, int climb, int len) {
+static double tukey(int n, double alpha, int climb, int len) {
 	return 1.0/2.0*(1.0 + cos(M_PI*((2.0*n)/(alpha*(len-1.0)) -1.0 + (1.0-climb)*(-2.0/alpha + 2.0))));
 }
 
@@ -397,7 +402,59 @@ void tukeyWindow(C_ARRAY *ca, double alpha) {
 }
 
 /*
- *	Counts Fourier transform, also makes scaling
+ *  Recursively computes Fourier transform performed on input array "ca"
+ *  Operates in O(N*log(N)), where N = ca->len is length of input array.
+ *  C_ARRAY *ca - input array of complex numbers i.e. sound track
+ */
+static C_ARRAY *recFFT(C_ARRAY *ca) {
+	/*  Round the length of input array to the nearest power of 2 */
+	int n = get_pow(ca->len, 2);
+	C_ARRAY *cy = allocCA(n);
+	cy->len = n;
+
+	if (n == 1) {
+		cy->c[0] = ca->c[0];
+		return cy;
+	}
+
+	C_ARRAY *ca_s = allocCA(n/2);
+	C_ARRAY *ca_l = allocCA(n/2);
+	C_ARRAY *cy_s, *cy_l;
+	
+	/*
+	 * Initialization of arrays:
+	 *   "ca_s" - elements with even index from array "ca"
+	 *   "ca_l" - elements with odd index from array "ca"
+	 */
+	int i;
+	for (i=0; i<n/2; i++) {
+		ca_s->c[ca_s->len++] = ca->c[2*i];
+		ca_l->c[ca_l->len++] = ca->c[2*i + 1];
+	}
+	
+	/* Recursion ready to run */
+	cy_s = recFFT(ca_s);
+	cy_l = recFFT(ca_l);
+	
+	/* Use data computed in recursion */
+	for (i=0; i < n/2; i++) {
+		/* Multiply entries of cy_l by the twiddle factors e^(-2*pi*i/N * k) */
+		cy_l->c[i] = complexMult(polarToComplex(1, -2*M_PI*i/n), cy_l->c[i]);
+	}
+	for (i=0; i < n/2; i++) {
+		cy->c[i] = complexAdd(cy_s->c[i], cy_l->c[i]);
+		cy->c[i + n/2] = complexSub(cy_s->c[i], cy_l->c[i]);
+	}
+
+	/* Release unnecessary memory */
+	freeCA(ca_s); freeCA(ca_l);
+	freeCA(cy_s); freeCA(cy_l);
+
+	return cy;
+}
+
+/*
+ *  Counts Fourier transform, also makes scaling
  */
 C_ARRAY *fft(C_ARRAY *ca) {
 	C_ARRAY *car;
@@ -406,8 +463,8 @@ C_ARRAY *fft(C_ARRAY *ca) {
 	int i;
 	for (i=0; i<len2; i++) {
 		if (i<len2/2) {
-			car->c[i].re /= len2/4;///2;
-			car->c[i].im /= len2/4;///2;
+			car->c[i].re /= len2/4;
+			car->c[i].im /= len2/4;
 		}
 		else {
 			car->c[i].re = 0.0;
@@ -432,57 +489,4 @@ C_ARRAY *ifft(C_ARRAY *ca) {
 	}
 
 	return car;
-}
-
-/*
- *	Recursively computes Fourier transform performed on input array "ca"
- *
- * 	C_ARRAY *ca	- input array of complex numbers ~ sample
- *
- */
-C_ARRAY *recFFT(C_ARRAY *ca) {
-	// Round the length of input array to the nearest power of 2
-	int n = get_pow(ca->len, 2);
-	C_ARRAY *cy = allocCA(n);
-	cy->len = n;
-
-	if (n == 1) {
-		cy->c[0] = ca->c[0];
-		return cy;
-	}
-
-	C_ARRAY *ca_s = allocCA(n/2);
-	C_ARRAY *ca_l = allocCA(n/2);
-	C_ARRAY *cy_s, *cy_l;
-	
-	/*
-	 *	Initialization of arrays:
-	 *		"ca_s" - elements with even index from array "ca"
-	 *		"ca_l" - elements with odd index from array "ca"
-	 */
-	int i;
-	for (i=0; i<n/2; i++) {
-		ca_s->c[ca_s->len++] = ca->c[2*i];
-		ca_l->c[ca_l->len++] = ca->c[2*i + 1];
-	}
-	
-	// Recursion ready to run
-	cy_s = recFFT(ca_s);
-	cy_l = recFFT(ca_l);
-	
-	// Use data computed in recursion
-	for (i=0; i < n/2; i++) {
-		// Multiply entries of cy_l by the twiddle factors e^(-2*pi*i/N * k)
-		cy_l->c[i] = complexMult(polarToComplex(1, -2*M_PI*i/n), cy_l->c[i]);
-	}
-	for (i=0; i < n/2; i++) {
-		cy->c[i] = complexAdd(cy_s->c[i], cy_l->c[i]);
-		cy->c[i + n/2] = complexSub(cy_s->c[i], cy_l->c[i]);
-	}
-
-	// Release unnecessary memory
-	freeCA(ca_s); freeCA(ca_l);
-	freeCA(cy_s); freeCA(cy_l);
-
-	return cy;
 }

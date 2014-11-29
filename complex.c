@@ -1,3 +1,37 @@
+/*
+ * Copyright (c) 2014, Vojtech Vasek
+ *
+
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.*
+ *  
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+/*
+ * ==============================================================================
+ *
+ *       Filename:  complex.c
+ *
+ *    Description:  Functions useful for storing sound information in array
+ *                  of complex numbers and basic operations with this arrays.
+ *                  It also has some functions connected with operations with
+ *                  complex numbers in general.
+ *
+ *         Author:  Vojtech Vasek
+ *
+ * ==============================================================================
+ */
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -54,6 +88,46 @@ COMPLEX polarToComplex(double r, double fi) {
 }
 
 /*
+ *  Returns COMPLEX number with parts set so that decibel
+ *   value is moved with value gain from previous.
+ */
+COMPLEX gainToComplex(COMPLEX cin, double gain) {
+	COMPLEX cret;
+	double aktdec = decibel(cin);
+	double MC = 1.0;
+	if (cin.im != 0 || cin.re == 0) {
+		MC = sqrt(pow(10.0, gain*0.1));
+	}
+	cret.re = cin.re * MC;
+	cret.im = cin.im * MC;
+
+	log_out(11, "before=%.2fdB after=%.2fdB, dif = %.2f\n", aktdec, decibel(cret), decibel(cret)-aktdec);
+	return cret;
+}
+
+/*
+ *  Returns "average" complex number from given array
+ *   and interval in it. Average is computed separately
+ *   for both real part and imaginary part of the complex
+ *   number.
+ */
+COMPLEX average(C_ARRAY *ca, int st, int len) {
+	COMPLEX av;
+	av.re = 0.0;
+	av.im = 0.0;
+
+	int i;
+	for (i=st; i < st+len; i++) {
+		av.re += ca->c[i].re;
+		av.im += ca->c[i].im;
+	}
+	av.re /= len;
+	av.im /= len;
+
+	return av;
+}
+
+/*
  *  Returns real part of given COMPLEX number.
  */
 double getRe(COMPLEX comp) {
@@ -88,26 +162,13 @@ double decibel(COMPLEX comp) {
 	return 20.0 * log10(magnitude(comp));
 }
 
+
 /*
- *  Returns COMPLEX number with parts set so that decibel
- *   value is moved with value gain from previous.
+ *  SECTION OF FUNCTIONS FOR CHANGING C_ARRAY VALUES
  */
-COMPLEX gainToComplex(COMPLEX cin, double gain) {
-	COMPLEX cret;
-	double aktdec = decibel(cin);
-	double MC = 1.0;
-	if (cin.im != 0 || cin.re == 0) {
-		MC = sqrt(pow(10.0, gain*0.1));
-	}
-	cret.re = cin.re * MC;
-	cret.im = cin.im * MC;
-
-	log_out(11, "before=%.2fdB after=%.2fdB, dif = %.2f\n", aktdec, decibel(cret), decibel(cret)-aktdec);
-	return cret;
-}
 
 /*
- *  Sets every element of given array to conjugate complex number.
+ *  Set every element of given array to conjugate complex number.
  */
 void conjugate(C_ARRAY *ca) {
 	int i;
@@ -116,9 +177,17 @@ void conjugate(C_ARRAY *ca) {
 	}
 }
 
+/*
+ *  Set complex number of specific position to given value.
+ */
+void setCA(C_ARRAY *ca, int pos, double re, double im) {
+	ca->c[pos].re = re;
+	ca->c[pos].im = im;
+}
+
 
 /*
- *  FUNCTIONS FOR WORKING WITH ARRAY OF COMPLEX NUMBERS / SAMPLES
+ *  FUNCTIONS FOR WORKING WITH ARRAY OF COMPLEX NUMBERS i.e. SOUND TRACK
  */
 
 /*
@@ -160,17 +229,17 @@ C_ARRAY *allocCA(unsigned int len) {
 }
 
 /*
- *  Reallocate given C_ARRAY structure, so that it has "nlen"
+ *  Reallocate given C_ARRAY structure, so that it has "new_len"
  *   COMPLEX numbers in it.
  */
-void reallocCA(C_ARRAY *ca, unsigned int nlen) {
+void reallocCA(C_ARRAY *ca, unsigned int new_len) {
 	int olen = ca->max;					// save previous length
 	
-	if ((ca->c = (COMPLEX *) realloc(ca->c, nlen * sizeof(COMPLEX))) == NULL) {
+	if ((ca->c = (COMPLEX *) realloc(ca->c, new_len * sizeof(COMPLEX))) == NULL) {
 		perror("malloc");
 	}
 
-	initCA(ca, nlen, olen);
+	initCA(ca, new_len, olen);
 }
 
 /*
@@ -234,10 +303,10 @@ C_ARRS *allocCAS(unsigned int len) {
 }
 
 /*
- *  Allocate "nlen" C_ARRAY structures in given C_ARRS structure.
+ *  Allocate "new_len" C_ARRAY structures in given C_ARRS structure.
  */
-void reallocCAS(C_ARRS *cas, unsigned int nlen) {
-	cas->max = nlen;
+void reallocCAS(C_ARRS *cas, unsigned int new_len) {
+	cas->max = new_len;
 	if ((cas->carrs = (C_ARRAY **) realloc(cas->carrs, cas->max * sizeof(C_ARRAY *))) == NULL) {
 		perror("realloc");
 	}

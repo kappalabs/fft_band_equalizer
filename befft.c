@@ -43,17 +43,17 @@ static void usage(void) {
 }
 
 /*
- *	Loads one input sample ~ array of real numbers into
- *	 C_ARRAY structure. Skips empty lines and everything
- *	 after character '#', which can be used for comments.
+ *  Loads one input sample ~ array of real numbers into
+ *   C_ARRAY structure. Skips empty lines and everything
+ *   after character '#', which can be used for comments.
  */
 static C_ARRAY *readLine(FILE *fin) {
 	char c;
 	C_ARRAY *in_arr;
 	in_arr = allocCA(512);
-	STRING *token = allocStr(16);
+	STRING token = alloc_string(16);
 
-	// skip comments and empty lines
+	/* Skip comments and empty lines */
 	c = getc(fin);
 	while ((c == '#' || c == ' ' || c == '\t' || c == '\n') && c != EOF) {
 		if (c == '#') {
@@ -62,26 +62,23 @@ static C_ARRAY *readLine(FILE *fin) {
 		c = getc(fin);
 	}
 
-	// read one line of input file
+	/* Read one line of input file */
 	while (c != '\n' && c != EOF && c != '#') {
-		//initString(token, 32);
-		initStr(token, token->max+1, 0);
+		init_string(&token, token.max, 0);
+		/* Skip empty characters at the begining */
 		while (c == ' ' || c == '\t') {
 			c = getc(fin);
 		}
-		// read one whole token ~ real number (double)
+		/* Read one whole token, i.e. real number (double) */
 		while (c != ' ' && c != '\n' && c != '\t') {
-			// we need to allocate more space for this number
-			if (token->max - token->len < 1) {
-				reallocStr(token, token->max + 8);
-			}
-			token->text[token->len++] = c;
+			//token->text[token->len++] = c;
+			append(&token, c);
 			c = getc(fin);
 		}
-		// add new token to "in_arr"
-		if (token->text != '\0') {
-			double din = atof(token->text);
-			// we need to allocate space for few more numbers
+		/* Add new token to "in_arr" */
+		if (token.len != 0) {
+			double din = atof(token.text);
+			/* We need to allocate space for few more numbers */
 			if (in_arr->max - in_arr->len <= 20) {
 				reallocCA(in_arr, get_pow(in_arr->len + 512, 2));
 			}
@@ -91,7 +88,7 @@ static C_ARRAY *readLine(FILE *fin) {
 
 		if (c == '\n') break;
 	}
-	freeStr(token);
+	free_string(&token);
 
 	return in_arr;
 }
@@ -211,50 +208,53 @@ struct b_modif *addModif(struct b_modif *head, struct octave *oct, char func, in
 }
 
 /*
- *	Parse option inputs and appropriately initialize
- *	 b_modif as LL of these modifications.
- *	Assume the input is in correct format.
+ *  Parse option inputs and appropriately initialize
+ *   b_modif as LL of these modifications.
+ *  Assume the input is in correct format.
  */
 struct b_modif *initModifs(struct b_modif *head, struct octave *oct, char *bands_in) {
 	int i=0;
 	char akt;
-	char *token = allocString(20);
+	STRING token = alloc_string(20);
 	int band_id;
 	char func;
 	int gain;
 	while ((akt = bands_in[i++]) != '\0' && i < strlen(bands_in)) {
-		// first we read band_id, which is integer
-		initString(token, 20);
+		/* First we read band_id, which is integer */
+		init_string(&token, 20, 0);
 		while (akt >= '0' && akt <= '9') {
-			append(token, akt);
+			append(&token, akt);
 			akt = bands_in[i++];
 		}
-		band_id = atoi(token);
+		band_id = atoi(token.text);
 
-		// now read charasteristic character of function to be used
+		/* Now read character defining the function to be used */
 		func = akt;
 		akt = bands_in[i++];
 
-		// now read the gain number
-		initString(token, 20);
+		/* 
+		 * Now read the gain (integer number with sign + or -)
+		 * No sign is also correct, its meaning is + sign.
+		 */
+		init_string(&token, 20, 0);
 		if (akt == '+' || akt == '-' || (akt >= '0' && akt <= '9')) {
-			append(token, akt);
+			append(&token, akt);
 			akt = bands_in[i++];
 		} else {
-			// the only thing we check for (might be unclear for users)
+			/* The only thing we check for (might be unclear for users) */
 			fprintf(stderr, "Incorrect sign before gain number\n");
 			usage();
 		}
-		// read the rest of the gain number (if exists)
+		/* Read the rest of the gain number (if exists) */
 		while (akt >= '0' && akt <= '9') {
-			append(token, akt);
+			append(&token, akt);
 			akt = bands_in[i++];
 		}
-		gain = atoi(token);
+		gain = atoi(token.text);
 
 		head = addModif(head, oct, func, band_id, gain);
 	}
-	free(token);
+	free_string(&token);
 
 	return head;
 }
@@ -354,35 +354,36 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	// in_file is required argument
+	/* "in_file" is required argument */
 	if (f_flag == 0) {
 		fprintf(stderr, "in_file required\n");
 		usage();
 	}
 
 	/*
-	 *	Stores all information from given WAV file header
+	 *  Stores all information from given WAV file header
 	 */
-	struct element *header;
+	ELEMENT *header;
 
-	// w_flag was not set, read in_file as raw input data ~ default
+	/* "w_flag" was not set, read "in_file" as raw input data (default) */
 	if (w_flag == 0) {
 		printf("Reading raw data from file \"%s\"...\n", in_file);
 		readInput(ins, in_file);
 	}
-	// w_flag was set, read in_file as WAV
+	/* "w_flag" was set, read in_file as WAV */
 	else {
 		printf("Reading wav input file from \"%s\"...\n", in_file);
 		header = readWav(ins, in_file);
 	}
 
-	/* Stores information about selected Octave, which includes
+	/*
+	 * Stores information about selected Octave, which includes
 	 *  number of all bands, selected fraction and bands itself
 	 *   as Bands elements in linked list.
 	 */
 	struct octave *oct;
 
-	// Check if r_value is in correct range
+	/* Check if "r_value" is in correct range [1; 24] */
 	if (r_flag != 0 && r_value > 0 && r_value < 25) {
 		printf("Changing to Octave [1/%d] bands\n", r_flag);
 	} else if (r_flag != 0) {
@@ -392,13 +393,13 @@ int main(int argc, char **argv) {
 	oct = initOctave(1000, r_value);
 
 	/*
-	 *	Stores all modifications given by virtual knobs parsed
-	 *	 from option "-k"
+	 *  Stores all modifications given by virtual knobs parsed
+	 *   from option "-k".
 	 */
 	struct b_modif *modifs_head;
 	modifs_head = NULL;
 
-	// Parse input virtual knots configuration
+	/* Parse input virtual knots configuration */
 	if (k_flag != 0) {
 		modifs_head = initModifs(modifs_head, oct, k_value);
 	}
@@ -407,18 +408,29 @@ int main(int argc, char **argv) {
 	printf("Got %d input samples\n", ins->len);
 
 	gnuplot_ctrl * g;
-	C_ARRAY *re, *ire;	// For temporary storing FFT and IFFT
-	C_ARRAY *win;	// Window for WLEN samples, works as kind of buffer
+	C_ARRAY *re, *ire;  /* For temporary storing FFT and IFFT results */
+	C_ARRAY *win;       /* Window for WLEN samples, works as kind of buffer */
 	win = allocCA(WLEN);
 	C_ARRAY *wav_out;
 
-	int i, j;
-	// For every channel of given WAV file
-	//  or every row of data from raw data file
+
+	/*
+	 *  MAIN LOOP
+	 *  ---------
+	 *  For every channel of given WAV file or every row of data
+	 *   from raw data file
+	 *   i)   separate file into windows,
+	 *   ii)  apply FFT on each window,
+	 *   iii) apply all modification selected by user,
+	 *   iv)  transfer through IFFT each window back,
+	 *   v)   connect all windows together into the result
+	 */
+	int i; /* Current sound track id */
 	for (i=0; i < ins->len; i++) {
 		int ilen = ins->carrs[i]->len;
 		int ilen2 = get_pow(ilen, 2);
 		int imax = ins->carrs[i]->max;
+		int j; /* For iteration through all points in graph */
 		double *x = allocDoubles(imax);
 		double *y = allocDoubles(imax);
 
@@ -437,13 +449,14 @@ int main(int argc, char **argv) {
 		gnuplot_plot_xy(g, x, y, ilen, "Input");
 		gnuplot_close(g);
 
-		char *fname = allocString(20);
-		sprintf(fname, "input_%d.mat", i+1);
-		writeOutput(fname, ins->carrs[i]);
+		STRING fname = alloc_string(20);
+		sprintf(fname.text, "input_%d.mat", i+1);
+		writeOutput(fname.text, ins->carrs[i]);
+		free_string(&fname);
 
 
 		/*
-		 *	Divide input samples into windows of specific length
+		 *  Divide input samples into windows of specific length
 		 */
 		wav_out = allocCA(ilen);
 		int win_num = (int) ceil(ilen/WLEN);
@@ -464,18 +477,16 @@ int main(int argc, char **argv) {
 			/* Transform sound to frequency domain */
 			re = fft(win);
 
-		g = gnuplot_init();
-		gnuplot_cmd(g, "set terminal png");
-		gnuplot_setstyle(g, "lines");
-		gnuplot_cmd(g, "set output \"fft_window_%d.png\"", w_i+1);
-		memset(x, 0, imax*sizeof(double));
-		memset(y, 0, imax*sizeof(double));
-		for (j=0; j < re->len; j++) {
-			x[j] = j;
-			y[j] = decibel(re->c[j]); 
-		}
-		gnuplot_plot_xy(g, x, y, re->len/2, "FT");
-		gnuplot_close(g);
+			g = gnuplot_init();
+			gnuplot_cmd(g, "set terminal png");
+			gnuplot_setstyle(g, "lines");
+			gnuplot_cmd(g, "set output \"fft_window_%d.png\"", w_i+1);
+			for (j=0; j < re->len; j++) {
+				x[j] = j;
+				y[j] = decibel(re->c[j]); 
+			}
+			gnuplot_plot_xy(g, x, y, re->len/2, "FT");
+			gnuplot_close(g);
 
 			/* Apply modifications */
 			processModifs(modifs_head, re, oct, getSampleRate(header));
@@ -486,20 +497,18 @@ int main(int argc, char **argv) {
 			freeCA(ire); freeCA(re);
 		}
 
-		g = gnuplot_init();
-		gnuplot_cmd(g, "set terminal png");
-		gnuplot_setstyle(g, "lines");
-		gnuplot_cmd(g, "set output \"wav_out.png\"");
-		memset(x, 0, imax*sizeof(double));
-		memset(y, 0, imax*sizeof(double));
-		for (j=0; j < wav_out->len; j++) {
-			x[j] = j; y[j] = wav_out->c[j].re;
-		}
-		gnuplot_plot_xy(g, x, y, wav_out->len, "Invers");
-		gnuplot_close(g);
-
-		// Write result to WAV file
+		/* Write the result into WAV file */
 		if (o_flag == 1) {
+			g = gnuplot_init();
+			gnuplot_cmd(g, "set terminal png");
+			gnuplot_setstyle(g, "lines");
+			gnuplot_cmd(g, "set output \"wav_out.png\"");
+			for (j=0; j < wav_out->len; j++) {
+				x[j] = j; y[j] = wav_out->c[j].re;
+			}
+			gnuplot_plot_xy(g, x, y, wav_out->len, "Invers");
+			gnuplot_close(g);
+
 			log_out(55, "Writing result to WAV file\n");
 			C_ARRS *caso;
 			caso = allocCAS(1);
@@ -511,12 +520,13 @@ int main(int argc, char **argv) {
 		}
 		printf("\n\n");
 
-		free(fname);
 		free(x); free(y);
 		freeCA(wav_out);
 	}
 	freeModifs(modifs_head);
-	freeHeader(header);
+	if (w_flag != 0) {
+		freeHeader(header);
+	}
 	freeOctave(oct);
 	freeCA(win);
 	freeCAS(ins);

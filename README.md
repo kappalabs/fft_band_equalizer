@@ -8,7 +8,7 @@ This project is an implementation of a simple band equalizer, with specifiable n
 Usage
 -----
 ```
-Usage: program -f in_file [-w] [-r denom] [-k list] [-d level]
+Usage: befft -f in_file [-w] [-r denom] [-k list] [-d level]
    -f in_file: set the name of an input file to "in_file"
 
    -w:         input file is in WAV format
@@ -48,7 +48,7 @@ Windowing
 ---------
 In equalizer.c, you can find three examples of window function, implemented are called Planck, Tukey, and Hamming. In this program, non of them is actualy used (using no advanced function is called using rectangular window function...), because of the fact, they need extra work to do, like handeling overlapping, etc. and after all, rectangular window is not that bad, it's certainly suitable for this application.
 
-For further details about this functionality, see Window functions bellow in the Links section.
+For further details about this functionality, see Window functions bellow in the [Links](#links) section.
 
 Requirements
 ------------
@@ -63,3 +63,4 @@ Links
    - https://ccrma.stanford.edu/courses/422/projects/WaveFormat/
  - Window functions
    - http://en.wikipedia.org/wiki/Window_function#A_list_of_window_functions
+   - http://edoc.mpg.de/395068

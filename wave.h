@@ -1,3 +1,37 @@
+/*
+ * Copyright (c) 2014, Vojtech Vasek
+ *
+
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.*
+ *  
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+/*
+ * ==============================================================================
+ *
+ *       Filename:  wave.h
+ *
+ *    Description:  This module is for work with WAV files.
+ *                  It allows to read and write in this format.
+ *                  This module defines structure ELEMENT, which is useful
+ *                  for storing data from head of the WAV file, and enum
+ *                  ENDIAN, which is useful for handeling data on byte-level.
+ *
+ *         Author:  Vojtech Vasek
+ *
+ * ==============================================================================
+ */
+
 
 #ifndef WAVE_H_
 #define WAVE_H_
@@ -5,29 +39,32 @@
 #include "complex.h"
 
 
+/*
+ *  This element simply represents type of endian.
+ */
 typedef enum {
-	LE = 0,
-	BE = 1,
+	LE = 0,  /* Little Endian */
+	BE = 1,  /* Big Endian */
 } ENDIAN;
 
 /*
  *  This structure represents one line.
  */
-struct element {
+typedef struct {
 	ENDIAN endian; // 1 - big endian, 0 - little endian
 	int offset;    // in number of bytes
 	short size;    // in number of bytes
 	char *name;    // few characters specifying element name
 	char *data;    // stores the data of this element itself
-};
+} ELEMENT;
 
 
-extern unsigned int getNumChannels(struct element *h);
-extern unsigned long getSampleRate(struct element *h);
-extern unsigned long getSubchunk2Size(struct element *h);
+extern unsigned int getNumChannels(ELEMENT *h);
+extern unsigned long getSampleRate(ELEMENT *h);
+extern unsigned long getSubchunk2Size(ELEMENT *h);
 
-extern struct element *readWav(C_ARRS *cas, char *path);
-extern void freeHeader(struct element *header);
-extern void writeWav(struct element *h, C_ARRS *cas, char *fpath);
+extern ELEMENT *readWav(C_ARRS *cas, char *path);
+extern void freeHeader(ELEMENT *header);
+extern void writeWav(ELEMENT *h, C_ARRS *cas, char *fpath);
 
 #endif

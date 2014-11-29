@@ -1,3 +1,39 @@
+/*
+ * Copyright (c) 2014, Vojtech Vasek
+ *
+
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.*
+ *  
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+/*
+ * ==============================================================================
+ *
+ *       Filename:  equalizer.h
+ *
+ *    Description:  This module contains functions for work with Octave, bands,
+ *                  sound modification and the Fourier transform itself.
+ *                  Octave and its bands are counted here from given
+ *                  base frequency and fraction denominator.
+ *                  Three window functions are Hamming(hammingWindow),
+ *                  Planck(planckWindow) and Tukey(tukeyWindow). Sound
+ *                  modification functions are called Flat(flatBand),
+ *                  Peak(peakBand) and Next(nextBand).
+ *
+ *         Author:  Vojtech Vasek
+ *
+ * ==============================================================================
+ */
 
 #ifndef EQUALIZER_H_
 #define EQUALIZER_H_
@@ -30,22 +66,23 @@ struct octave {
 };
 
 
-extern struct band *getBand(struct octave *oct, int band_id);
+extern struct octave *initOctave(int base, int frac);
+extern void freeOctave(struct octave *);
 
-extern void peakBand(C_ARRAY *samples, struct band *b, int sample_rate, double gain);
-extern void flatBand(C_ARRAY *samples, struct band *b, int sample_rate, double gain);
-extern void nextBand(C_ARRAY *samples, struct band *b, int sample_rate, double gain);
+extern struct band *getBand(struct octave *, int band_id);
 
-extern struct octave *initOctave(int from, int frac);
-extern void freeOctave(struct octave *oct);
+extern void modulateFreq(C_ARRAY *, int st, int tg, double mult, double adit, int srate);
+extern void modulateBand(C_ARRAY *, struct octave *, int index, double mult, double adit, int sample_rate);
+
+extern void flatBand(C_ARRAY *, struct band *, int sample_rate, double gain);
+extern void peakBand(C_ARRAY *, struct band *, int sample_rate, double gain);
+extern void nextBand(C_ARRAY *, struct band *, int sample_rate, double gain);
 
 extern void hammingWindow(C_ARRAY *ca, double alpha, double beta);
 extern void planckWindow(C_ARRAY *ca, double epsilon);
 extern void tukeyWindow(C_ARRAY *ca, double alpha);
-extern void smooth(C_ARRAY *ca, int st, int tg);
 
 extern C_ARRAY *fft(C_ARRAY *ca);
 extern C_ARRAY *ifft(C_ARRAY *ca);
-extern C_ARRAY *recFFT(C_ARRAY *ca);
 
 #endif
