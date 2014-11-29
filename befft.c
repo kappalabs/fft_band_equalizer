@@ -152,7 +152,7 @@ static C_ARRAY *readLine(FILE *fin) {
 static void readInput(C_ARRS *inputs, char *file_name) {
 	FILE *fin;
 
-	if ((fin = open(file_name, "r")) == NULL) {
+	if ((fin = fopen(file_name, "r")) == NULL) {
 		perror("fopen");
 		exit (ERROR_EXIT_CODE);
 	}
