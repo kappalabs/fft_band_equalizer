@@ -1,3 +1,54 @@
+/*
+ * Copyright (c) 2014, Vojtech Vasek
+ *
+
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.*
+ *  
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+/*
+ * ==============================================================================
+ *
+ *       Filename:  befft.c
+ *
+ *    Description:  This program takes input file either with raw input data
+ *                  where each input sample should be on separate line and
+ *                  every value of this sample is separated by white-space.
+ *                  If line starts with # character, then it's ignored, as well
+ *                  as if it doesn't contains any non-white characters.
+ *                  Input file can also be in WAV format, then you have to
+ *                  write option -w.
+ *
+ *                  Band modification is defined by other option -k, format of
+ *                  its value is [b(number)][f(char)][s(char)][g(number)],
+ *                  where 'b' is selected band, 'f' is function for equalization,
+ *                  's' is sign for 'g' which is gain in dB units from range
+ *                  [-24; 24].
+ *
+ *                  For further details about options see usage, e.g. by running
+ *                  ./befft without options.
+ *
+ *                  Output is either interpreted in graph, or as WAV sound file,
+ *                  in case input was also in WAV file format.
+ *
+ *                  Every transformation is interpretted in graph, therefore
+ *                  gnuplot program is required for this functionality.
+ *
+ *         Author:  Vojtech Vasek
+ *
+ * ==============================================================================
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -8,24 +59,25 @@
 #include <errno.h>
 #include <ctype.h>
 
-// Interpret data in chart
+/* Interpret data in chart */
 #include "gnuplot_i.h"
-// My header files
+/* My own modules */
 #include "my_std.h"
 #include "equalizer.h"
 #include "complex.h"
 #include "string.h"
 #include "wave.h"
 
-// Size of one window (# of samples to transform in one step)
+/* Size of one window (# of samples to transform in one step) */
 #define WLEN (4096*1)
 
 
-// Stores the name of this program
-char const * program_name;
+/* Stores the name of this program */
+char const *program_name;
 
-
-
+/*
+ *  Print out to the standard output information about usage of this program.
+ */
 static void usage(void) {
 	fprintf(stderr, "Usage: %s -f in_file [-w] [-r denom] [-k list] [-d level]\n"
 		"   -f in_file: set the name of an input file to \"in_file\"\n\n"
@@ -94,25 +146,25 @@ static C_ARRAY *readLine(FILE *fin) {
 }
 
 /*
- *	Loads data from input file to structure C_ARRS.
- *	Each input sample is on its line.
+ *  Read data from input file and store them into structure C_ARRS.
+ *   Each input sample is on its line.
  */
 static void readInput(C_ARRS *inputs, char *file_name) {
 	FILE *fin;
 
-	if ((fin = fopen(file_name, "r")) == NULL) {
+	if ((fin = open(file_name, "r")) == NULL) {
 		perror("fopen");
 		exit (ERROR_EXIT_CODE);
 	}
 
 	do {
-		// we need to allocate more space for input samples
+		/* Check if we need to allocate more space for input values */
 		if (inputs->max - inputs->len <= 1) {
 			reallocCAS(inputs, inputs->max + 8);
 		}
 		inputs->carrs[inputs->len] = readLine(fin);
 	} while(inputs->carrs[inputs->len++]->len > 0);
-	// We do not need the last one, it's empty
+	/* We do not need the last one, it's empty */
 	freeCA(inputs->carrs[--inputs->len]);
 
 	if (fclose(fin) == EOF) {
@@ -122,7 +174,7 @@ static void readInput(C_ARRS *inputs, char *file_name) {
 }
 
 /*
- *	Writes array of complex numbers to specified file in Octave format
+ *  Writes array of complex numbers to specified file in Octave/Matlab format.
  */
 static void writeOutput(char *file_name, C_ARRAY *ca) {
 	FILE *fout;
@@ -132,13 +184,14 @@ static void writeOutput(char *file_name, C_ARRAY *ca) {
 		exit (ERROR_EXIT_CODE);
 	}
 
-	fprintf(fout, "# Created by KAFOURIER, @timestamp <kappa@kappa>\n");
+	/* Write Octave/Matlab file head */
+	fprintf(fout, "# Created by %s, @timestamp <kappa@kappa>\n", program_name);
 	fprintf(fout, "# name:\tcompl\n");
 	fprintf(fout, "# type:\tcomplex matrix\n");
 	fprintf(fout, "# rows:\t1\n");
 	fprintf(fout, "# columns:\t%d\n", ca->len);
 
-
+	/* Write out the data */
 	int i;
 	for (i=0; i<ca->len; i++) {
 		fprintf(fout, " (%.14f,%.14f)", ca->c[i].re, ca->c[i].im);
@@ -152,22 +205,22 @@ static void writeOutput(char *file_name, C_ARRAY *ca) {
 
 
 /*
- *	Structure used to save all modification that will
- *	 be applied in linked list - LL
+ *  Structure used to save all modification that will
+ *   be applied in linked list.
  */
 struct b_modif {
-	// C_ARRAY *sample, int srate, double gain [-24,+24]
+	/* C_ARRAY *sample, int srate, double gain [-24,+24] */
 	void (*modif_f)(C_ARRAY *, struct band *, int, double);
-	// which band will be modified
+	/* Which band will be modified */
 	int band_id;
-	// what will be the gain passed into the modification function
+	/* What will be the gain passed into the modification function */
 	double gain;
-	// next operation in LL - linked list
+	/* Next operation in this linked list */
 	struct b_modif *next;
 };
 
 /*
- *	Adds new modification to the linked list structure
+ *  Add new modification to the linked list structure b_modif.
  */
 struct b_modif *addModif(struct b_modif *head, struct octave *oct, char func, int band_id, double gain) {
 	printf("New modifier: func=%c band_id=%d gain=%.2fdB\n", func, band_id, gain);
@@ -176,11 +229,13 @@ struct b_modif *addModif(struct b_modif *head, struct octave *oct, char func, in
 		perror("malloc");
 	}
 
+	/* Check, if given band_id is really part of given Octave */
 	if (band_id < 1 || band_id > oct->len) {
 		fprintf(stderr, "Band ID is out of range [1; %d]\n", oct->len);
 		usage();
 	}
 	nbm->band_id = band_id;
+	/* Check range of given gain, allowed are only values from range [-24; 24] */
 	if (gain < -24.0 || gain > 24.0) {
 		fprintf(stderr, "Gain is out of range [-24; 24]dB\n");
 		usage();
@@ -188,37 +243,45 @@ struct b_modif *addModif(struct b_modif *head, struct octave *oct, char func, in
 	nbm->gain = gain;
 	nbm->next = head;
 
+	/* Decide which function will be used to modificate this band */
 	switch (func) {
 		case 'p':
-						nbm->modif_f = peakBand;
-						break;
+			nbm->modif_f = peakBand;
+			break;
 		case 'f':
-						nbm->modif_f = flatBand;
-						break;
+			nbm->modif_f = flatBand;
+			break;
 		case 'n':
-						nbm->modif_f = nextBand;
-						break;
+			nbm->modif_f = nextBand;
+			break;
 		default:
-						fprintf(stderr, "Unknown modification function\n");
-						usage();
-						break;
+			fprintf(stderr, "Unknown modification function\n");
+			usage();
+			break;
 	}
 
 	return nbm;
 }
 
 /*
- *  Parse option inputs and appropriately initialize
- *   b_modif as LL of these modifications.
- *  Assume the input is in correct format.
+ *  Parse option inputs and appropriately initialize b_modif as a linked list
+ *   of these modifications.
+ *   
+ *  We assume the input is in correct format, therefore only the last two parameters
+ *   are being checked, bad function is recognized when we are adding new 
+ *   modification to the linked list.
+ *
+ *  Element of the string "bands_in" should have following format:
+ *   [band(number)][function(character)][sign(character)][gain(number)]
+ *   every element should be separated by comma.
  */
 struct b_modif *initModifs(struct b_modif *head, struct octave *oct, char *bands_in) {
-	int i=0;
-	char akt;
+	int  i=0;     /* Defines position in bands_in string */
+	char akt;     /* Currently proccesed character */
+	int  band_id; /* "band_id" value, that was readed from current element */
+	char func;    /* Function defining character, readed from current element */
+	int  gain;    /* Gain value from current element */
 	STRING token = alloc_string(20);
-	int band_id;
-	char func;
-	int gain;
 	while ((akt = bands_in[i++]) != '\0' && i < strlen(bands_in)) {
 		/* First we read band_id, which is integer */
 		init_string(&token, 20, 0);
@@ -260,12 +323,12 @@ struct b_modif *initModifs(struct b_modif *head, struct octave *oct, char *bands
 }
 
 /*
- *	Execute all of the modifications in the b_modif LL
+ *  Execute all of the modifications in the b_modif linked list on "ca" array.
  */
 void processModifs(struct b_modif *head, C_ARRAY *ca, struct octave *oct, int srate) {
 	struct b_modif *actb;
 	actb = head;
-	// go throught all of them and make the modification
+	/* Go through the linked list and apply each modification */
 	while (actb != NULL) {
 		struct band *bnd = getBand(oct, actb->band_id);
 		log_out(71, "Processing modification of %d. band with gain %.2f\n", actb->band_id, actb->gain);
@@ -276,7 +339,7 @@ void processModifs(struct b_modif *head, C_ARRAY *ca, struct octave *oct, int sr
 }
 
 /*
- *	Free allocated space on heap
+ *  Free allocated space on heap by b_modif structure
  */
 void freeModifs(struct b_modif *head) {
 	struct b_modif *prev, *pom;
@@ -295,16 +358,17 @@ int main(int argc, char **argv) {
 	ins = allocCAS(8);
 
 	int opt;
-	int f_flag=0;	// read input from file in_file
-	int w_flag=0;	// treat input as file in WAV format
-	int o_flag=0; // write output to file out_file
-	int r_flag=0; // set Octave fraction, default is Octave [1/1]
-	int k_flag=0; // settings of virtual knots
-	int r_value=1;  // stores fraction value, default is 1
-	char *k_value;  // stores settings of virtual knots
-	char *in_file;  // stores name of input file (if f_flag==1)
-	char *out_file; // stores name of output file (if o_flag==1)
-	// Read and process all options given to this program
+	int f_flag=0;	/* Read input from file in_file */
+	int w_flag=0;	/* Treat input as file in WAV format */
+	int o_flag=0;   /* Write output to file out_file */
+	int r_flag=0;   /* Set Octave fraction, default is Octave [1/1] */
+	int k_flag=0;   /* Settings of virtual knots */
+	int r_value=1;  /* Fraction denominator value, default is 1 */
+	char *k_value;  /* Settings of virtual knots */
+	char *in_file;  /* Name of input file (if f_flag==1) */
+	char *out_file; /* Name of output file (if o_flag==1) */
+
+	/* Read and process all options given to this program */
 	while ((opt = getopt(argc, argv, "f:wd:o:r:k:")) != -1) {
 		switch(opt) {
 			case 'f':
@@ -312,12 +376,12 @@ int main(int argc, char **argv) {
 					fprintf(stderr, "Only one input file is required\n");
 					usage();
 				}
-				// set in_file name to the value of the next argument
+				/* Set "in_file" name to the value of the next argument */
 				f_flag = 1;
 				in_file = optarg;
 				break;
 			case 'w':
-				// read in_file as WAV sound file
+				/* Read "in_file" as WAV sound file */
 				w_flag = 1;
 				break;
 			case 'o':
@@ -325,17 +389,17 @@ int main(int argc, char **argv) {
 					fprintf(stderr, "Only one output file is required\n");
 					usage();
 				}
-				// write output to out_file in WAV format
+				/* Write output to out_file in WAV format */
 				o_flag = 1;
 				out_file = optarg;
 				break;
 			case 'd':
-				// get debug level (integer value)
+				/* Get debug level (integer value) */
 				debug = atoi(optarg);
 				printf("Changing debug level to %d\n", debug);
 				break;
 			case 'r':
-				// set Octave fraction denominator
+				/* Set Octave fraction denominator */
 				r_flag = 1;
 				r_value = atoi(optarg);
 				break;
@@ -344,7 +408,7 @@ int main(int argc, char **argv) {
 					fprintf(stderr, "Only one set of virtual knots configuration is allowed\n");
 					usage();
 				}
-				// prepare modification functions
+				/* Prepare modification functions */
 				k_flag = 1;
 				k_value = optarg;
 				break;
@@ -356,7 +420,7 @@ int main(int argc, char **argv) {
 
 	/* "in_file" is required argument */
 	if (f_flag == 0) {
-		fprintf(stderr, "in_file required\n");
+		fprintf(stderr, "Argument in_file is required\n");
 		usage();
 	}
 
@@ -470,17 +534,22 @@ int main(int argc, char **argv) {
 			win->len = MIN(WLEN, ilen - w_i*WLEN);
 
 			/* Not actually used, window functions needs to handle overlapping */
-			//hammingWindow(win, 0.53836, 0.46164);
-			//planckWindow(win, 0.1);
-			//tukeyWindow(win, 0.1);
+			/* 
+			 * hammingWindow(win, 0.53836, 0.46164);
+			 * planckWindow(win, 0.1);
+			 * tukeyWindow(win, 0.1);
+			 */
 
 			/* Transform sound to frequency domain */
 			re = fft(win);
 
+			/* Plot graph of decibel values of each frequency */
 			g = gnuplot_init();
 			gnuplot_cmd(g, "set terminal png");
 			gnuplot_setstyle(g, "lines");
 			gnuplot_cmd(g, "set output \"fft_window_%d.png\"", w_i+1);
+			gnuplot_set_ylabel(g, "dBPS");
+			gnuplot_set_xlabel(g, "frequency (Hz)");
 			for (j=0; j < re->len; j++) {
 				x[j] = j;
 				y[j] = decibel(re->c[j]); 
