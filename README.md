@@ -48,16 +48,16 @@ Knob has some properties, which are:
  - **knob ID** - this specifies which knob will be adjusted
  - **gain** - as knob can be rotated, this virtual knob can have values from range \[-24; +24\], gain is in dB units
  - **modulation function** - how the gain should be performed
-   - **flat** This function adds the same gain to all samples in band, where it's being applied. It's the most simple one mostly used only on analog devices for equalization.
-![Alt text](/resources/flat.png "Flat function")
-   - **peak** This function is using quadratic polynomial for counting it's values, it's also mostly used on analog devices.
+   - **flat** - This function adds the same gain to all samples in band, where it's being applied. It's the most simple one mostly used only on analog devices for equalization.
+![Alt text](./resources/flat.png "Flat function")
+   - **peak** - This function is using quadratic polynomial for counting it's values, it's also mostly used on analog devices.
 ![Alt text](./resources/peak.png "Peak function")
-   - **next** Next function is used only on digital equalizers, it doesn't modify the whole band, but it starts in the middle of selected band and reaches the max gain in the middle of next band. In this program, sinus function is used for implementation of it.
-![Alt text](/resources/next.png "Next function")
+   - **next** - Next function is used only on digital equalizers, it doesn't modify the whole band, but it starts in the middle of selected band and reaches the max gain in the middle of next band. In this program, sinus function is used for implementation of it.
+![Alt text](./resources/next.png "Next function")
 
 Windowing
 ---------
-In equalizer.c, you can find three examples of window function, implemented are called Planck, Tukey, and Hamming. In this program, non of them is actualy used (using no advanced function is called using rectangular window function...), because of the fact, they need extra work to do, like handeling overlapping, etc. and after all, rectangular window is not that bad, it's certainly suitable for this application.
+In *equalizer.c*, you can find three examples of window function, implemented are called **Planck**, **Tukey**, and **Hamming**. In this program, non of them is actualy used (using no advanced function is called using rectangular window function...), because of the fact, they need extra work to do, like handeling overlapping, etc. and after all, rectangular window is not that bad, it's certainly suitable for this application.
 
 For further details about this functionality, see Window functions bellow in the [Links](#links) section.
 
