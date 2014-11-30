@@ -25,10 +25,12 @@ Usage: ./befft -f in_file [-w] [-r denom] [-k list] [-d level]
         (default value is 1)
 
    -k list:    list defines configuration of virtual knobs separated by commas, every knob has 3 properties:
-        band ID:  integer representing specific band, interval depends on choosen Octave fraction (-r option)
-        function: must be one of "f" for flat, "p" for peak, or "n" for next
-        gain:     integer value from range [-24; 24] (in dB) with, or without its sign
-        EXAMPLE:  -k 1f+20,7n-24,42p+21 (use flat function applied to the first band with gain 20dB, etc.)
+        band range:  either one integer representing specific band, or two integers with character '-' in between,
+                     to define range of bands, valid band ID value depends on choosen Octave fraction (-r option)
+        function:    must be one of "f" for Flat, "p" for Peak, or "n" for Next
+        gain:        integer value from range [-24; 24] (in dB) with, or without its sign
+        EXAMPLE:     -k 1f+20,7-9n-24,42p21 (use Flat function applied to the first band with gain 20dB,
+                     then use Next function applied on bands 7,8 and 9 with gain -24dB, etc.)
 
    -d level:   changes debug level to "level", smaller value means more info
         (default value is 90, used range is [1; 100])

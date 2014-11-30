@@ -30,8 +30,10 @@
  *                  write option -w.
  *
  *                  Band modification is defined by other option -k, format of
- *                  its value is [b(number)][f(char)][s(char)][g(number)],
- *                  where 'b' is selected band, 'f' is function for equalization,
+ *                  its value is:
+ *                  [b1(number)][-b2(number)][f(char)][s(char)][g(number)],
+ *                  where 'b2' is optional and together with 'b1', it defines
+ *                  range of selected bands, 'f' is function for equalization,
  *                  's' is sign for 'g' which is gain in dB units from range
  *                  [-24; 24].
  *
@@ -85,10 +87,12 @@ static void usage(void) {
 		"   -r denom:   set Octave bands control to [1/denom] (must be in range [1; 24] by standard ISO)\n"
 		"        (default value is 1)\n\n"
 		"   -k list:    list defines configuration of virtual knobs separated by commas, every knob has 3 properties:\n"
-		"        band ID:  integer representing specific band, interval depends on choosen Octave fraction (-r option)\n"
-		"        function: must be one of \"f\" for flat, \"p\" for peak, or \"n\" for next\n"
-		"        gain:     integer value from range [-24; 24] (in dB) with, or without its sign\n"
-		"        EXAMPLE:  -k 1f+20,7n-24,42p+21 (use flat function applied to the first band with gain 20dB, etc.)\n\n"
+		"        band range:  either one integer representing specific band, or two integers with character '-' in between,\n"
+		"                     to define range of bands, valid band ID value depends on choosen Octave fraction (-r option)\n"
+		"        function:    must be one of \"f\" for flat, \"p\" for peak, or \"n\" for next\n"
+		"        gain:        integer value from range [-24; 24] (in dB) with, or without its sign\n"
+		"        EXAMPLE:     -k 1f+20,7-9n-24,42p21 (use Flat function applied to the first band with gain 20dB,\n"
+	        "                     then use Next function applied on bands 7,8 and 9 with gain -24dB, etc.)\n\n"
 		"   -d level:   changes debug level to \"level\", smaller value means more info\n"
 		"        (default value is 90, used range is [1; 100])\n", program_name);
 	exit (ERROR_EXIT_CODE);
@@ -272,13 +276,14 @@ struct b_modif *addModif(struct b_modif *head, struct octave *oct, char func, in
  *   modification to the linked list.
  *
  *  Element of the string "bands_in" should have following format:
- *   [band(number)][function(character)][sign(character)][gain(number)]
- *   every element should be separated by comma.
+ *   [band_start(number)][-band_end(number)][function(char)][sign(char)][gain(number)]
+ *   where "band_end" and "sing" are not required, elements should be separated by comma.
  */
 struct b_modif *initModifs(struct b_modif *head, struct octave *oct, char *bands_in) {
 	int  i=0;     /* Defines position in bands_in string */
 	char akt;     /* Currently proccesed character */
-	int  band_id; /* "band_id" value, that was readed from current element */
+	int  band_id1;/* First band ID value, that was readed from current element */
+	int  band_id2;/* Specifies the second range margin of bands that will be modified */
 	char func;    /* Function defining character, readed from current element */
 	int  gain;    /* Gain value from current element */
 	STRING token = alloc_string(20);
@@ -289,7 +294,19 @@ struct b_modif *initModifs(struct b_modif *head, struct octave *oct, char *bands
 			append(&token, akt);
 			akt = bands_in[i++];
 		}
-		band_id = atoi(token.text);
+		band_id1 = atoi(token.text);
+		band_id2 = band_id1;
+
+		/* Read the second range margin if exists */
+		if (akt == '-') {
+			init_string(&token, 20, 0);
+			akt = bands_in[i++];
+			while (akt >= '0' && akt <= '9') {
+				append(&token, akt);
+				akt = bands_in[i++];
+			}
+			band_id2 = atoi(token.text);
+		}
 
 		/* Now read character defining the function to be used */
 		func = akt;
@@ -315,7 +332,14 @@ struct b_modif *initModifs(struct b_modif *head, struct octave *oct, char *bands
 		}
 		gain = atoi(token.text);
 
-		head = addModif(head, oct, func, band_id, gain);
+		/* 
+		 * Go through the whole range of given bands IDs and add
+		 * each of them as a new modification to the linked list.
+		 */
+		int j;
+		for (j=band_id1; j <= band_id2; j++) {
+			head = addModif(head, oct, func, j, gain);
+		}
 	}
 	free_string(&token);
 
@@ -351,6 +375,16 @@ void freeModifs(struct b_modif *head) {
 	}
 }
 
+/*
+ *  First read all options, set appropriately option flags and check
+ *  if selected options are compatible.
+ *
+ *  Then accordingly to these flags, read input file and prepare
+ *  linked list of all modifications.
+ *
+ *  After that proceed to applying all modifications on every input
+ *  sample and save the result both as graph and as sound data file.
+ */
 int main(int argc, char **argv) {
 	program_name = basename(argv[0]);
 
@@ -529,6 +563,7 @@ int main(int argc, char **argv) {
 		int w_i;
 		for (w_i=0; w_i < win_num; w_i++) {
 			log_out(55, "Processing %d. window:\n", w_i+1);
+			/* Copy data from input track into new window */
 			copyCA(ins->carrs[i], w_i*WLEN, win, 0, WLEN);
 			win->max = WLEN;
 			win->len = MIN(WLEN, ilen - w_i*WLEN);
@@ -561,13 +596,15 @@ int main(int argc, char **argv) {
 			processModifs(modifs_head, re, oct, getSampleRate(header));
 			/* Transform back to time domain */
 			ire = ifft(re);
+			/* Add new modified result to the end of the output array */
 			copyCA(ire, 0, wav_out, w_i*WLEN, MIN(WLEN, ilen - w_i*WLEN));
 
 			freeCA(ire); freeCA(re);
 		}
 
-		/* Write the result into WAV file */
+		/* Write the result into WAV file if input was WAV file */
 		if (o_flag == 1) {
+			/* Plot the result sound file */
 			g = gnuplot_init();
 			gnuplot_cmd(g, "set terminal png");
 			gnuplot_setstyle(g, "lines");
@@ -578,6 +615,7 @@ int main(int argc, char **argv) {
 			gnuplot_plot_xy(g, x, y, wav_out->len, "Invers");
 			gnuplot_close(g);
 
+			/* Write into WAV */
 			log_out(55, "Writing result to WAV file\n");
 			C_ARRS *caso;
 			caso = allocCAS(1);
