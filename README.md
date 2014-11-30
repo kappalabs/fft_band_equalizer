@@ -5,10 +5,18 @@ Introduction
 ------------
 This project is an implementation of a simple band equalizer, with specifiable number of bands controllable by user, with usage of Fast Fourier Transform in C language. Input can be either raw data or sound file in WAV format, the same applies for output.
 
+INSTALLATION
+------------
+After you download the git repository, simply write:
+
+     make
+
+For the purpose of plotting the graphs, you also need to install gnuplot on your system (see gnuplot in [Links](#links) section for official web page).
+
 Usage
 -----
 ```
-Usage: befft -f in_file [-w] [-r denom] [-k list] [-d level]
+Usage: ./befft -f in_file [-w] [-r denom] [-k list] [-d level]
    -f in_file: set the name of an input file to "in_file"
 
    -w:         input file is in WAV format
@@ -40,9 +48,12 @@ Knob has some properties, which are:
  - **knob ID** - this specifies which knob will be adjusted
  - **gain** - as knob can be rotated, this virtual knob can have values from range \[-24; +24\], gain is in dB units
  - **modulation function** - how the gain should be performed
-   - **flat** TODO
-   - **peak** TODO
-   - **next** TODO
+   - **flat** This function adds the same gain to all samples in band, where it's being applied. It's the most simple one mostly used only on analog devices for equalization.
+![Alt text](/resources/flat.png "Flat function")
+   - **peak** This function is using quadratic polynomial for counting it's values, it's also mostly used on analog devices.
+![Alt text](./resources/peak.png "Peak function")
+   - **next** Next function is used only on digital equalizers, it doesn't modify the whole band, but it starts in the middle of selected band and reaches the max gain in the middle of next band. In this program, sinus function is used for implementation of it.
+![Alt text](/resources/next.png "Next function")
 
 Windowing
 ---------
@@ -64,3 +75,5 @@ Links
  - Window functions
    - http://en.wikipedia.org/wiki/Window_function#A_list_of_window_functions
    - http://edoc.mpg.de/395068
+ - gnuplot
+   - http://www.gnuplot.info

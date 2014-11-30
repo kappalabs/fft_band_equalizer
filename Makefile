@@ -23,7 +23,6 @@ main.o:	gnuplot_i.o equalizer.o complex.o string.o	#? $(OBJS)
 
 
 #INFILE = "flute-A4.wav"
-#INFILE = "flute-samp.wav"
 INFILE = "dve-32.wav"
 #INFILE = "singing-female.wav"
 debug:	clean $(PROG)
