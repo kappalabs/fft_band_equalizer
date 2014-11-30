@@ -42,7 +42,7 @@ Octave is term, which describes bands of frequencies in frequency domain of the 
 
 In this program, the fraction is in form 1/denom, and you can select desired denominator by an *-r* option. Bigger denominator means more bands in Octave. Commonly used are 1/3 (30 bands), 1/6 (60 bands) and 1/12 Octave. Maximum allowed is 1/24 Octave which has about 243 bands to controll.
 
-Knob handeling
+Knob handling
 --------------
 After you select you desired Octave, you now have achieved some number of virtual knobs to handle. Every knob is connected to some Octave band, and it can be handled by an *-k* option (see specification above in [Usage](#usage) section).
 
@@ -51,11 +51,14 @@ Knob has some properties, which are:
  - **gain** - as knob can be rotated, this virtual knob can have values from range \[-24; +24\], gain is in dB units
  - **modulation function** - how the gain should be performed
    - **flat** - This function adds the same gain to all samples in band, where it's being applied. It's the most simple one mostly used only on analog devices for equalization.
-![Alt text](./resources/flat.png "Flat function")
+
+	![Alt text](./resources/flat.png "Flat function")
    - **peak** - This function is using quadratic polynomial for counting it's values, it's also mostly used on analog devices.
-![Alt text](./resources/peak.png "Peak function")
+
+	![Alt text](./resources/peak.png "Peak function")
    - **next** - Next function is used only on digital equalizers, it doesn't modify the whole band, but it starts in the middle of selected band and reaches the max gain in the middle of next band. In this program, sinus function is used for implementation of it.
-![Alt text](./resources/next.png "Next function")
+
+	![Alt text](./resources/next.png "Next function")
 
 Windowing
 ---------
