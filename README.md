@@ -70,7 +70,7 @@ Running tests
 -------------
 Test WAV sound files are located in *tests/* directory. Bash script named *tester.sh* has few commented tests and it will run the **befft** program to modify these files from *tests/* folder with predefined different settings.
 
-Test sound files are either from [SoundBible][], [MTG Github][mtgg], or they were created with GNU Octave.
+Test sound files are either from [SoundBible](http://soundbible.com/), [MTG Github](https://github.com/MTG/sms-tools/tree/master/sounds), or they were created with GNU Octave.
 
 Requirements
 ------------
@@ -88,5 +88,7 @@ Links
    - http://edoc.mpg.de/395068
  - gnuplot
    - http://www.gnuplot.info
- - [SoundBible] http://soundbible.com/
- - [mtgg] https://github.com/MTG/sms-tools/tree/master/sounds
+ - SoundBible
+   - http://soundbible.com/)
+ - MTG Github
+   - https://github.com/MTG/sms-tools/tree/master/sounds
