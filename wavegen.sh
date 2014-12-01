@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Script for generating specific note with specific length of specific number of samples with usage of GNU Octave
+
 fout="sound_in.mat"
 sampout="sample.in"
 

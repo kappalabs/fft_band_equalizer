@@ -1,4 +1,7 @@
 function playsound(wav, samplerate)
+# Written by Timmmm
+# Code from http://stackoverflow.com/questions/1478071/how-do-i-play-a-sound-in-octave
+#
 # Play a single-channel wave at a certain sample rate (defaults to 44100 Hz).
 # Input can be integer, in which case it is assumed to be signed 16-bit, or
 # float, in which case it is in the range -1:1.

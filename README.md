@@ -66,10 +66,16 @@ In *equalizer.c*, you can find three examples of window function, implemented ar
 
 For further details about this functionality, see Window functions bellow in the [Links](#links) section.
 
+Running tests
+-------------
+Test WAV sound files are located in *tests/* directory. Bash script named *tester.sh* has few commented tests and it will run the **befft** program to modify these files from *tests/* folder with predefined different settings.
+
+Test sound files are either from [SoundBible][], [MTG Github][mtgg], or they were created with GNU Octave.
+
 Requirements
 ------------
  - **gnuplot** - used to simplify graphical output
- - **Octave/Matlab** - if you want to use generated data
+ - **GNU Octave** - if you want to use generated raw data
 
 Links
 -----
@@ -82,3 +88,5 @@ Links
    - http://edoc.mpg.de/395068
  - gnuplot
    - http://www.gnuplot.info
+ - [SoundBible] http://soundbible.com/
+ - [mtgg] https://github.com/MTG/sms-tools/tree/master/sounds

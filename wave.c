@@ -251,7 +251,11 @@ static C_ARRAY *getChannel(int fd, short ch_id) {
 		perror("calloc");
 		return NULL;
 	}
-	while (read(fd, buf, B_SIZE) > 0 && r < tns) {
+	/*
+	 * At the end of file, there could be additional information,
+	 * therefore we do not want to exceed # of samples for this channel
+	 */
+	while (read(fd, buf, B_SIZE) > 0 && r < tns/(B_SIZE*nch)) {
 		/* Check if we need more memory for next values */
 		if (ca->max == ca->len) {
 			reallocCA(ca, get_pow(ca->len + 64, 2));
@@ -401,7 +405,7 @@ void writeWav(ELEMENT *h, C_ARRS *cas, char *fpath) {
 
 	/* Check if we have the same # of channels as its in header */
 	if (nch != cas->len) {
-		fprintf(stderr, "Header file improperly set.\n");
+		fprintf(stderr, "Header file improperly set, %d channels required, got %d.\n", nch, cas->len);
 		return;
 	}
 	/* Create if not exists, rewrite existing file */
@@ -417,7 +421,7 @@ void writeWav(ELEMENT *h, C_ARRS *cas, char *fpath) {
 	/* Write all given channels */
 	int i;
 	for (i=0; i<nch; i++) {
-		printf("Writing out %d channel...\n", i+1);
+		printf("Writing out %d. channel...\n", i+1);
 		writeChannel(h, cas->carrs[i], fd, i);
 	}
 

@@ -71,7 +71,7 @@
 #include "wave.h"
 
 /* Size of one window (# of samples to transform in one step) */
-#define WLEN (4096*1)
+#define WLEN (4096*2)
 
 
 /* Stores the name of this program */
@@ -178,7 +178,7 @@ static void readInput(C_ARRS *inputs, char *file_name) {
 }
 
 /*
- *  Writes array of complex numbers to specified file in Octave/Matlab format.
+ *  Writes array of complex numbers to specified file in GNU Octave format.
  */
 static void writeOutput(char *file_name, C_ARRAY *ca) {
 	FILE *fout;
@@ -188,7 +188,7 @@ static void writeOutput(char *file_name, C_ARRAY *ca) {
 		exit (ERROR_EXIT_CODE);
 	}
 
-	/* Write Octave/Matlab file head */
+	/* Write GNU Octave file head */
 	fprintf(fout, "# Created by %s, @timestamp <kappa@kappa>\n", program_name);
 	fprintf(fout, "# name:\tcompl\n");
 	fprintf(fout, "# type:\tcomplex matrix\n");
@@ -388,8 +388,9 @@ void freeModifs(struct b_modif *head) {
 int main(int argc, char **argv) {
 	program_name = basename(argv[0]);
 
-	C_ARRS *ins;
+	C_ARRS *ins;   /* For storing input samples/channels */
 	ins = allocCAS(8);
+	C_ARRS *outs;  /* For storing output samples/channels */
 
 	int opt;
 	int f_flag=0;	/* Read input from file in_file */
@@ -473,6 +474,8 @@ int main(int argc, char **argv) {
 		printf("Reading wav input file from \"%s\"...\n", in_file);
 		header = readWav(ins, in_file);
 	}
+	/* Now when we know the number of input samples/channels, lets allocate output */
+	outs = allocCAS(ins->len);
 
 	/*
 	 * Stores information about selected Octave, which includes
@@ -509,7 +512,7 @@ int main(int argc, char **argv) {
 	C_ARRAY *re, *ire;  /* For temporary storing FFT and IFFT results */
 	C_ARRAY *win;       /* Window for WLEN samples, works as kind of buffer */
 	win = allocCA(WLEN);
-	C_ARRAY *wav_out;
+	//C_ARRAY *wav_out;
 
 
 	/*
@@ -538,8 +541,6 @@ int main(int argc, char **argv) {
 		gnuplot_cmd(g, "set terminal png");
 		gnuplot_setstyle(g, "lines");
 		gnuplot_cmd(g, "set output \"input_%d.png\"", i+1);
-		memset(x, 0, imax*sizeof(double));
-		memset(y, 0, imax*sizeof(double));
 		for (j=0; j<ilen; j++) {
 			x[j] = j;
 			y[j] = ins->carrs[i]->c[j].re;
@@ -547,6 +548,7 @@ int main(int argc, char **argv) {
 		gnuplot_plot_xy(g, x, y, ilen, "Input");
 		gnuplot_close(g);
 
+		/* Write input data as raw data in GNU Octave/Matlab-like format */
 		STRING fname = alloc_string(20);
 		sprintf(fname.text, "input_%d.mat", i+1);
 		writeOutput(fname.text, ins->carrs[i]);
@@ -556,7 +558,7 @@ int main(int argc, char **argv) {
 		/*
 		 *  Divide input samples into windows of specific length
 		 */
-		wav_out = allocCA(ilen);
+		outs->carrs[i] = allocCA(ilen);
 		int win_num = (int) ceil(ilen/WLEN);
 		log_out(45, "Total number of windows is %d\n", win_num);
 		log_out(71, "\n");
@@ -590,46 +592,51 @@ int main(int argc, char **argv) {
 				y[j] = decibel(re->c[j]); 
 			}
 			gnuplot_plot_xy(g, x, y, re->len/2, "FT");
-			gnuplot_close(g);
 
 			/* Apply modifications */
 			processModifs(modifs_head, re, oct, getSampleRate(header));
+
+			/* Plot graph of modified values in decibel units */
+			gnuplot_cmd(g, "set terminal png");
+			gnuplot_setstyle(g, "lines");
+			gnuplot_cmd(g, "set output \"fft_window_%d.png\"", w_i+1);
+			for (j=0; j < re->len; j++) {
+				x[j] = j;
+				y[j] = decibel(re->c[j]); 
+			}
+			gnuplot_plot_xy(g, x, y, re->len/2, "FT-modif");
+			gnuplot_close(g);
+
 			/* Transform back to time domain */
 			ire = ifft(re);
 			/* Add new modified result to the end of the output array */
-			copyCA(ire, 0, wav_out, w_i*WLEN, MIN(WLEN, ilen - w_i*WLEN));
+			copyCA(ire, 0, outs->carrs[i], w_i*WLEN, MIN(WLEN, ilen - w_i*WLEN));
 
 			freeCA(ire); freeCA(re);
 		}
 
-		/* Write the result into WAV file if input was WAV file */
-		if (o_flag == 1) {
-			/* Plot the result sound file */
-			g = gnuplot_init();
-			gnuplot_cmd(g, "set terminal png");
-			gnuplot_setstyle(g, "lines");
-			gnuplot_cmd(g, "set output \"wav_out.png\"");
-			for (j=0; j < wav_out->len; j++) {
-				x[j] = j; y[j] = wav_out->c[j].re;
-			}
-			gnuplot_plot_xy(g, x, y, wav_out->len, "Invers");
-			gnuplot_close(g);
-
-			/* Write into WAV */
-			log_out(55, "Writing result to WAV file\n");
-			C_ARRS *caso;
-			caso = allocCAS(1);
-			caso->carrs[caso->len++] = wav_out;
-			writeWav(header, caso, out_file);
-
-			free(caso->carrs);
-			free(caso);
+		/* Plot the result sound file */
+		g = gnuplot_init();
+		gnuplot_cmd(g, "set terminal png");
+		gnuplot_setstyle(g, "lines");
+		gnuplot_cmd(g, "set output \"output_%d.png\"", i+1);
+		for (j=0; j < outs->carrs[i]->len; j++) {
+			x[j] = j; y[j] = outs->carrs[i]->c[j].re;
 		}
+		gnuplot_plot_xy(g, x, y, outs->carrs[i]->len, "Invers");
+		gnuplot_close(g);
 		printf("\n\n");
 
+		outs->len++;
+
 		free(x); free(y);
-		freeCA(wav_out);
 	}
+	/* Write input channels into WAV file if WAV was on input */
+	if (o_flag == 1) {
+		log_out(55, "Writing result into WAV sound file\n");
+		writeWav(header, outs, out_file);
+	}
+
 	freeModifs(modifs_head);
 	if (w_flag != 0) {
 		freeHeader(header);
@@ -637,6 +644,7 @@ int main(int argc, char **argv) {
 	freeOctave(oct);
 	freeCA(win);
 	freeCAS(ins);
+	freeCAS(outs);
 
 	return (0);
 }
